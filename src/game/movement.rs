@@ -15,10 +15,14 @@
 
 use std::time::Duration;
 
-use bevy::prelude::*;
+use bevy::{
+    ecs::{lifecycle::HookContext, world::DeferredWorld},
+    prelude::*,
+};
 use bevy_inspector_egui::egui::lerp;
+use rand::seq::IndexedRandom;
 
-use crate::{AppSystems, PausableSystems};
+use crate::{AppSystems, PausableSystems, audio::sound_effect, game::player::PlayerAssets};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
@@ -35,6 +39,8 @@ pub(super) fn plugin(app: &mut App) {
 /// other players as well.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
+#[component(on_add)]
+#[require(Transform)]
 pub struct HopMovementController {
     /// Desired location on x,z plane
     pub intent: Vec2,
@@ -65,11 +71,23 @@ impl Default for HopMovementController {
 }
 
 impl HopMovementController {
+    fn on_add(mut world: DeferredWorld, context: HookContext) {
+        // Initialise intent to the spawned position
+        let pos = world
+            .get::<Transform>(context.entity)
+            .unwrap()
+            .translation
+            .xz();
+        let mut entity = world.get_mut::<Self>(context.entity).unwrap();
+        entity.intent = pos;
+    }
+
     pub fn apply_movement(&mut self, direction: Vec2) {
         self.intent += direction * self.move_speed_mult;
     }
 
-    pub fn update(&mut self, delta_secs: f32, current_pos: Vec2) {
+    /// Returns true if just started a hop
+    pub fn update(&mut self, delta_secs: f32, current_pos: Vec2) -> bool {
         self.timer
             .tick(Duration::from_secs_f32(delta_secs * self.hop_speed_mult));
         if self.timer.is_finished() {
@@ -89,19 +107,24 @@ impl HopMovementController {
                     self.timer.reset();
                     self.current_hop_src = Some(current_pos);
                     self.current_hop_dest = Some(self.intent);
+                    return true;
                 }
             }
         }
+        false
     }
 }
 
 fn apply_hop_movement(
     time: Res<Time>,
     mut movement_query: Query<(&mut HopMovementController, &mut Transform)>,
+    player_assets: If<Res<PlayerAssets>>,
+    mut commands: Commands,
 ) {
     for (mut controller, mut transform) in &mut movement_query {
-        controller.update(time.delta_secs(), transform.translation.xz());
+        let just_hopped = controller.update(time.delta_secs(), transform.translation.xz());
         if controller.airborne {
+            // Lerp from source to destination
             if let (Some(src), Some(dest)) =
                 (controller.current_hop_src, controller.current_hop_dest)
             {
@@ -109,8 +132,24 @@ fn apply_hop_movement(
                 let y = lerp(src.y..=dest.y, controller.timer.fraction());
                 transform.translation.x = x;
                 transform.translation.z = y;
-                transform.translation.y = jump_height(controller.timer.fraction()) + 0.5;
+                transform.translation.y = jump_height(controller.timer.fraction());
             }
+        }
+        if just_hopped {
+            // rotate to face direction of movement
+            if let (Some(src), Some(dest)) =
+                (controller.current_hop_src, controller.current_hop_dest)
+            {
+                let dir = dest - src;
+                if dir.length_squared() > 0.0001 {
+                    let yaw = dir.x.atan2(dir.y);
+                    transform.rotation = Quat::from_rotation_y(yaw);
+                }
+            }
+            // play a random hop sound
+            let rng = &mut rand::rng();
+            let random_step = player_assets.steps.choose(rng).unwrap().clone();
+            commands.spawn(sound_effect(random_step));
         }
     }
 }

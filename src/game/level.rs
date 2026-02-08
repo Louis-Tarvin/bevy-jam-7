@@ -4,6 +4,8 @@ use bevy::prelude::*;
 
 use crate::{asset_tracking::LoadResource, game::player::player, screens::Screen};
 
+pub const GOAL_RADIUS: f32 = 6.0;
+
 pub(super) fn plugin(app: &mut App) {
     app.load_resource::<LevelAssets>();
 }
@@ -27,13 +29,27 @@ impl FromWorld for LevelAssets {
     }
 }
 
+#[derive(Component)]
+pub struct GoalLocation;
+
 /// A system that spawns the main level.
 pub fn spawn_level(
     mut commands: Commands,
+    mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
     level_assets: Res<LevelAssets>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let mut gizmo = GizmoAsset::new();
+
+    gizmo
+        .sphere(
+            Isometry3d::IDENTITY,
+            GOAL_RADIUS,
+            bevy::color::palettes::css::CRIMSON,
+        )
+        .resolution(30_000 / 6);
+
     commands.spawn((
         Name::new("Level"),
         Transform::default(),
@@ -50,9 +66,23 @@ pub fn spawn_level(
                 Name::new("Sun"),
                 DirectionalLight {
                     shadows_enabled: true,
+                    color: Color::srgb(0.284, 0.358, 0.659),
                     ..Default::default()
                 },
                 Transform::from_xyz(0.5, 0.3, 1.0).looking_at(Vec3::ZERO, Vec3::Y)
+            ),
+            (
+                Name::new("Goal"),
+                GoalLocation,
+                Transform::from_xyz(0.0, 0.0, 10.0),
+                Gizmo {
+                    handle: gizmo_assets.add(gizmo),
+                    line_config: GizmoLineConfig {
+                        width: 0.5,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
             )
         ],
     ));

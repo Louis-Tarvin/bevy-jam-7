@@ -113,5 +113,10 @@ fn spawn_camera(mut commands: Commands) {
             ..OrthographicProjection::default_3d()
         }),
         Transform::from_xyz(0.0, 10.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        AmbientLight {
+            color: Color::srgb(0.5, 0.5, 1.0),
+            brightness: 0.2,
+            ..Default::default()
+        },
     ));
 }
