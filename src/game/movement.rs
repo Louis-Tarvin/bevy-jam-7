@@ -22,7 +22,11 @@ use bevy::{
 use bevy_inspector_egui::egui::lerp;
 use rand::seq::IndexedRandom;
 
-use crate::{AppSystems, PausableSystems, audio::sound_effect, game::player::PlayerAssets};
+use crate::{
+    AppSystems, PausableSystems,
+    audio::{sound_effect, sound_effect_3d},
+    game::{level::LevelBounds, player::PlayerAssets},
+};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
@@ -52,6 +56,23 @@ pub struct HopMovementController {
     pub hop_time_length: f32,
     pub airborne: bool,
     pub timer: Timer,
+}
+
+impl HopMovementController {
+    pub fn new(
+        move_speed_mult: f32,
+        hop_speed_mult: f32,
+        time_between_hops: f32,
+        hop_time_length: f32,
+    ) -> Self {
+        Self {
+            move_speed_mult,
+            hop_speed_mult,
+            time_between_hops,
+            hop_time_length,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for HopMovementController {
@@ -120,14 +141,17 @@ fn apply_hop_movement(
     mut movement_query: Query<(&mut HopMovementController, &mut Transform)>,
     player_assets: If<Res<PlayerAssets>>,
     mut commands: Commands,
+    bounds: Res<LevelBounds>,
 ) {
     for (mut controller, mut transform) in &mut movement_query {
+        controller.intent = bounds.clamp_to_bounds(controller.intent);
         let just_hopped = controller.update(time.delta_secs(), transform.translation.xz());
         if controller.airborne {
             // Lerp from source to destination
             if let (Some(src), Some(dest)) =
                 (controller.current_hop_src, controller.current_hop_dest)
             {
+                let dest = bounds.clamp_to_bounds(dest);
                 let x = lerp(src.x..=dest.x, controller.timer.fraction());
                 let y = lerp(src.y..=dest.y, controller.timer.fraction());
                 transform.translation.x = x;
@@ -149,7 +173,7 @@ fn apply_hop_movement(
             // play a random hop sound
             let rng = &mut rand::rng();
             let random_step = player_assets.steps.choose(rng).unwrap().clone();
-            commands.spawn(sound_effect(random_step));
+            commands.spawn(sound_effect_3d(random_step, transform.translation));
         }
     }
 }

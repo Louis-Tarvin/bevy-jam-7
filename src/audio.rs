@@ -33,6 +33,19 @@ pub fn sound_effect(handle: Handle<AudioSource>) -> impl Bundle {
     (AudioPlayer(handle), PlaybackSettings::DESPAWN, SoundEffect)
 }
 
+pub fn sound_effect_3d(handle: Handle<AudioSource>, translation: Vec3) -> impl Bundle {
+    (
+        AudioPlayer(handle),
+        PlaybackSettings {
+            mode: bevy::audio::PlaybackMode::Despawn,
+            spatial: true,
+            ..PlaybackSettings::ONCE
+        },
+        SoundEffect,
+        Transform::from_translation(translation),
+    )
+}
+
 /// [`GlobalVolume`] doesn't apply to already-running audio entities, so this system will update them.
 fn apply_global_volume(
     global_volume: Res<GlobalVolume>,

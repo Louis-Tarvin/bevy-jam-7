@@ -8,7 +8,7 @@ use bevy::{
 };
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
-use crate::screens::Screen;
+use crate::{game::level::LevelBounds, screens::Screen};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(EguiPlugin::default()).add_plugins(
@@ -27,6 +27,7 @@ pub(super) fn plugin(app: &mut App) {
         Update,
         spawn_debug_camera.run_if(input_just_pressed(KeyCode::F2)),
     );
+    app.add_systems(Update, draw_level_bounds);
 }
 
 const TOGGLE_KEY: KeyCode = KeyCode::Backquote;
@@ -50,4 +51,20 @@ fn spawn_debug_camera(mut commands: Commands, cameras: Query<Entity, With<Camera
             ..default()
         },
     ));
+}
+
+fn draw_level_bounds(mut gizmos: Gizmos, bounds: Res<LevelBounds>) {
+    const HEIGHT_OFFSET: f32 = 0.5;
+    let min = Vec3::new(bounds.min.x, HEIGHT_OFFSET, bounds.min.y);
+    let max = Vec3::new(bounds.max.x, HEIGHT_OFFSET, bounds.max.y);
+    let a = Vec3::new(min.x, HEIGHT_OFFSET, min.z);
+    let b = Vec3::new(max.x, HEIGHT_OFFSET, min.z);
+    let c = Vec3::new(max.x, HEIGHT_OFFSET, max.z);
+    let d = Vec3::new(min.x, HEIGHT_OFFSET, max.z);
+    let color = Color::srgb(0.9, 0.7, 0.2);
+
+    gizmos.line(a, b, color);
+    gizmos.line(b, c, color);
+    gizmos.line(c, d, color);
+    gizmos.line(d, a, color);
 }

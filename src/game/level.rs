@@ -8,6 +8,26 @@ pub const GOAL_RADIUS: f32 = 6.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.load_resource::<LevelAssets>();
+    app.insert_resource(LevelBounds {
+        min: (-34.5, -49.5).into(),
+        max: (34.5, 9.5).into(),
+    });
+}
+
+#[derive(Resource, Debug, Reflect)]
+#[reflect(Resource)]
+pub struct LevelBounds {
+    pub max: Vec2,
+    pub min: Vec2,
+}
+
+impl LevelBounds {
+    pub fn clamp_to_bounds(&self, pos: Vec2) -> Vec2 {
+        Vec2::new(
+            pos.x.clamp(self.min.x, self.max.x),
+            pos.y.clamp(self.min.y, self.max.y),
+        )
+    }
 }
 
 #[derive(Resource, Asset, Clone, Reflect)]

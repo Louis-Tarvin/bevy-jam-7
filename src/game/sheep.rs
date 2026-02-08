@@ -9,7 +9,7 @@ use crate::{
     AppSystems, PausableSystems,
     asset_tracking::LoadResource,
     game::{
-        level::{GOAL_RADIUS, GoalLocation},
+        level::{GOAL_RADIUS, GoalLocation, LevelBounds},
         movement::HopMovementController,
         player::Player,
         state::GameState,
@@ -53,8 +53,8 @@ impl Sheep {
         let mut wander = Self {
             state: SheepState::Wander(Timer::from_seconds(1.0, TimerMode::Once)),
             step_distance: 2.0,
-            min_wait: 0.6,
-            max_wait: 2.0,
+            min_wait: 1.5,
+            max_wait: 5.0,
             spooked_speed_mult: 2.0,
         };
         wander.reset_timer();
@@ -122,6 +122,7 @@ fn sheep_state_update(
     mut sheep_query: Query<(&mut HopMovementController, &Transform, &mut Sheep)>,
     player_query: Query<&Transform, With<Player>>,
     goal_query: Query<&Transform, (With<GoalLocation>, Without<Player>)>,
+    bounds: Res<LevelBounds>,
 ) {
     for (mut controller, transform, mut sheep) in &mut sheep_query {
         let pos = transform.translation.xz();
@@ -139,7 +140,8 @@ fn sheep_state_update(
                     sheep.state = SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
                     sheep.reset_timer();
                 } else {
-                    let dir = (pos - danger_pos).normalize_or(Vec2::X);
+                    let preferred = (pos - danger_pos).normalize_or(Vec2::X);
+                    let dir = pick_evasion_dir(pos, preferred, &bounds);
                     controller.apply_movement(dir * time.delta_secs() * sheep.step_distance);
                 }
             }
@@ -184,4 +186,26 @@ fn sheep_goal_check(
             }
         }
     }
+}
+
+// To prevent sheep getting stuck in corners
+fn pick_evasion_dir(pos: Vec2, preferred: Vec2, bounds: &LevelBounds) -> Vec2 {
+    let candidates = [preferred.perp(), -preferred.perp(), -preferred];
+
+    let mut best_dir = preferred;
+    let target = bounds.clamp_to_bounds(pos + preferred);
+    if target == pos + preferred {
+        return preferred;
+    }
+    let mut best_score = target.distance_squared(pos);
+    for dir in candidates {
+        let target = bounds.clamp_to_bounds(pos + dir);
+        let score = target.distance_squared(pos);
+        if score > best_score {
+            best_score = score;
+            best_dir = dir;
+        }
+    }
+
+    best_dir
 }

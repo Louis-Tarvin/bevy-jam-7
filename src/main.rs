@@ -12,7 +12,11 @@ mod menus;
 mod screens;
 mod theme;
 
-use bevy::{asset::AssetMetaCheck, prelude::*};
+use bevy::{
+    asset::AssetMetaCheck,
+    audio::{DefaultSpatialScale, SpatialScale},
+    prelude::*,
+};
 
 use crate::game::camera::MainCamera;
 
@@ -70,6 +74,7 @@ impl Plugin for AppPlugin {
 
         // Set up the `Pause` state.
         app.init_state::<Pause>();
+        app.insert_resource(DefaultSpatialScale(SpatialScale(Vec3::splat(0.15))));
         app.configure_sets(Update, PausableSystems.run_if(in_state(Pause(false))));
 
         // Spawn the main camera.
