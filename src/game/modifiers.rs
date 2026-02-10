@@ -1,9 +1,10 @@
+use bevy::prelude::*;
 use rand::{
     Rng,
     distr::{Distribution, StandardUniform},
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum Modifier {
     HyperSheep,
     MoonGravity,
@@ -29,6 +30,16 @@ impl Modifier {
             Modifier::Placeholder2 => "Placeholder modifier.",
         }
     }
+
+    pub fn difficulty(&self) -> ModifierDifficulty {
+        use ModifierDifficulty::*;
+        match self {
+            Modifier::HyperSheep => Easy,
+            Modifier::MoonGravity => Medium,
+            Modifier::Placeholder1 => Hard,
+            Modifier::Placeholder2 => Easy,
+        }
+    }
 }
 
 impl Distribution<Modifier> for StandardUniform {
@@ -38,6 +49,22 @@ impl Distribution<Modifier> for StandardUniform {
             1 => Modifier::MoonGravity,
             2 => Modifier::Placeholder1,
             _ => Modifier::Placeholder2,
+        }
+    }
+}
+
+pub enum ModifierDifficulty {
+    Easy,
+    Medium,
+    Hard,
+}
+
+impl ModifierDifficulty {
+    pub fn coins_given(&self) -> u8 {
+        match self {
+            ModifierDifficulty::Easy => 4,
+            ModifierDifficulty::Medium => 5,
+            ModifierDifficulty::Hard => 6,
         }
     }
 }

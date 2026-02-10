@@ -48,6 +48,53 @@ pub fn label(text: impl Into<String>) -> impl Bundle {
     )
 }
 
+pub fn panel() -> impl Bundle {
+    (
+        Name::new("Panel"),
+        Node {
+            width: percent(90),
+            max_width: px(1000),
+            padding: UiRect::all(px(28)),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            flex_direction: FlexDirection::Column,
+            row_gap: px(20),
+            border_radius: BorderRadius::all(px(18)),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.08, 0.08, 0.1, 0.95)),
+    )
+}
+
+pub fn row() -> impl Bundle {
+    (
+        Name::new("Row"),
+        Node {
+            width: percent(100),
+            justify_content: JustifyContent::SpaceAround,
+            align_items: AlignItems::FlexStart,
+            flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
+            column_gap: px(24),
+            row_gap: px(24),
+            ..default()
+        },
+    )
+}
+
+/// A horizontal divider line.
+pub fn divider() -> impl Bundle {
+    (
+        Name::new("Divider"),
+        Node {
+            width: percent(90),
+            height: px(2),
+            ..default()
+        },
+        BackgroundColor(LABEL_TEXT.with_alpha(0.35)),
+    )
+}
+
 /// A large rounded button with text and an action defined as an [`Observer`].
 pub fn button<E, B, M, I>(text: impl Into<String>, action: I) -> impl Bundle
 where

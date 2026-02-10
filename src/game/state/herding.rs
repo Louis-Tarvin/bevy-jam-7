@@ -78,7 +78,7 @@ pub fn on_herding(
 
 fn check_points_goal(game_state: Res<GameState>, mut next_state: ResMut<NextState<GamePhase>>) {
     if game_state.points >= game_state.point_target {
-        next_state.set(GamePhase::Interlude);
+        next_state.set(GamePhase::ModifierChoice);
     }
 }
 

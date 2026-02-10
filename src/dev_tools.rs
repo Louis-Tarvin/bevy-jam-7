@@ -77,5 +77,5 @@ fn draw_level_bounds(mut gizmos: Gizmos, bounds: Res<LevelBounds>) {
 }
 
 fn skip_to_interlude(mut next_state: ResMut<NextState<GamePhase>>) {
-    next_state.set(GamePhase::Interlude);
+    next_state.set(GamePhase::ModifierChoice);
 }

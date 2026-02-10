@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use crate::{asset_tracking::LoadResource, game::player::player, screens::Screen};
+use crate::{asset_tracking::LoadResource, screens::Screen};
 
 pub const GOAL_RADIUS: f32 = 6.0;
 
