@@ -87,7 +87,7 @@ impl FromWorld for SheepAssets {
     }
 }
 
-pub fn spawn_sheep(sheep_assets: &SheepAssets, position: Vec3) -> impl Bundle {
+pub fn sheep(sheep_assets: &SheepAssets, position: Vec3) -> impl Bundle {
     (
         Name::new("Sheep"),
         Sheep::new(),

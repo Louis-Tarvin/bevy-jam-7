@@ -8,7 +8,10 @@ use bevy::{
 };
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
-use crate::{game::level::LevelBounds, screens::Screen};
+use crate::{
+    game::{level::LevelBounds, state::GamePhase},
+    screens::Screen,
+};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(EguiPlugin::default()).add_plugins(
@@ -28,6 +31,10 @@ pub(super) fn plugin(app: &mut App) {
         spawn_debug_camera.run_if(input_just_pressed(KeyCode::F2)),
     );
     app.add_systems(Update, draw_level_bounds);
+    app.add_systems(
+        Update,
+        skip_to_interlude.run_if(input_just_pressed(KeyCode::F3)),
+    );
 }
 
 const TOGGLE_KEY: KeyCode = KeyCode::Backquote;
@@ -67,4 +74,8 @@ fn draw_level_bounds(mut gizmos: Gizmos, bounds: Res<LevelBounds>) {
     gizmos.line(b, c, color);
     gizmos.line(c, d, color);
     gizmos.line(d, a, color);
+}
+
+fn skip_to_interlude(mut next_state: ResMut<NextState<GamePhase>>) {
+    next_state.set(GamePhase::Interlude);
 }

@@ -57,8 +57,6 @@ pub fn spawn_level(
     mut commands: Commands,
     mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
     level_assets: Res<LevelAssets>,
-    meshes: ResMut<Assets<Mesh>>,
-    materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mut gizmo = GizmoAsset::new();
 
@@ -76,7 +74,6 @@ pub fn spawn_level(
         Visibility::default(),
         DespawnOnExit(Screen::Gameplay),
         children![
-            player(meshes, materials),
             // (
             //     Name::new("Gameplay Music"),
             //     music(level_assets.music.clone())
