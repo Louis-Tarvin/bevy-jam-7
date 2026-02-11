@@ -33,8 +33,11 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub enum SheepState {
     Wander(Timer),
+    /// Player is nearby - move away from them
     Evading(Vec2),
+    /// Player barked - run away
     Spooked(Vec2),
+    /// Near the goal - move towards it
     BeingCounted,
 }
 
@@ -45,6 +48,7 @@ pub struct Sheep {
     step_distance: f32,
     min_wait: f32,
     max_wait: f32,
+    default_speed_mult: f32,
     spooked_speed_mult: f32,
 }
 
@@ -55,6 +59,7 @@ impl Sheep {
             step_distance: 2.0,
             min_wait: 1.5,
             max_wait: 5.0,
+            default_speed_mult: 1.0,
             spooked_speed_mult: 2.0,
         };
         wander.reset_timer();
@@ -67,6 +72,15 @@ impl Sheep {
             let wait = rng.random_range(self.min_wait..self.max_wait);
             timer.set_duration(Duration::from_secs_f32(wait));
             timer.reset();
+        }
+    }
+
+    pub fn become_spooked(&mut self, danger_pos: Vec2) {
+        match self.state {
+            SheepState::Wander(_) | SheepState::Evading(_) => {
+                self.state = SheepState::Spooked(danger_pos);
+            }
+            _ => {}
         }
     }
 }
@@ -128,6 +142,7 @@ fn sheep_state_update(
         let pos = transform.translation.xz();
         match sheep.state {
             SheepState::Wander(_) => {
+                controller.hop_speed_mult = sheep.default_speed_mult;
                 for player_transform in player_query {
                     let player_pos = player_transform.translation.xz();
                     if pos.distance(player_pos) < SHEEP_INTERACT_RANGE {
@@ -142,6 +157,7 @@ fn sheep_state_update(
                 } else {
                     let preferred = (pos - danger_pos).normalize_or(Vec2::X);
                     let dir = pick_evasion_dir(pos, preferred, &bounds);
+                    controller.hop_speed_mult = sheep.default_speed_mult;
                     controller.apply_movement(dir * time.delta_secs() * sheep.step_distance);
                 }
             }
@@ -158,7 +174,8 @@ fn sheep_state_update(
             SheepState::BeingCounted => {
                 let goal_pos = goal_query.single().unwrap().translation.xz();
                 let dir = (goal_pos - pos).normalize_or(Vec2::X);
-                controller.hop_speed_mult = 0.5;
+                controller.hop_speed_mult = 0.8;
+                controller.move_speed_mult = 0.8;
                 controller.apply_movement(dir * time.delta_secs() * sheep.step_distance);
             }
         }

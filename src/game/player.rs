@@ -3,18 +3,24 @@
 use bevy::prelude::*;
 
 use crate::{
-    AppSystems, PausableSystems, asset_tracking::LoadResource,
-    game::movement::HopMovementController,
+    AppSystems, PausableSystems,
+    asset_tracking::LoadResource,
+    game::{movement::HopMovementController, sheep::Sheep},
 };
 
 pub(super) fn plugin(app: &mut App) {
     app.load_resource::<PlayerAssets>();
 
-    // Record directional input as movement controls.
     app.add_systems(
         Update,
-        record_player_directional_input
+        (record_player_directional_input, handle_bark)
             .in_set(AppSystems::RecordInput)
+            .in_set(PausableSystems),
+    );
+    app.add_systems(
+        Update,
+        tick_player_timers
+            .in_set(AppSystems::TickTimers)
             .in_set(PausableSystems),
     );
 }
@@ -26,7 +32,7 @@ pub fn player(
 ) -> impl Bundle {
     (
         Name::new("Player"),
-        Player,
+        Player::default(),
         Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.5, 0.0),
@@ -35,9 +41,49 @@ pub fn player(
     )
 }
 
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+#[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct Player;
+pub struct Player {
+    pub bark_radius: f32,
+    pub bark_cooldown: Timer,
+}
+impl Default for Player {
+    fn default() -> Self {
+        Self {
+            bark_radius: 8.0,
+            bark_cooldown: Timer::from_seconds(2.0, TimerMode::Once),
+        }
+    }
+}
+
+fn tick_player_timers(time: Res<Time>, player_query: Query<&mut Player>) {
+    for mut player in player_query {
+        player.bark_cooldown.tick(time.delta());
+    }
+}
+
+fn handle_bark(
+    player_query: Query<(&mut Player, &Transform)>,
+    mut sheep_query: Query<(&mut Sheep, &Transform), Without<Player>>,
+    input: Res<ButtonInput<KeyCode>>,
+) {
+    if input.just_pressed(KeyCode::KeyE) || input.just_pressed(KeyCode::Space) {
+        for (mut player, player_transform) in player_query {
+            if player.bark_cooldown.is_finished() {
+                let player_pos = player_transform.translation.xz();
+                player.bark_cooldown.reset();
+                for (mut sheep, sheep_transform) in sheep_query.iter_mut() {
+                    let sheep_pos = sheep_transform.translation.xz();
+                    if player_pos.distance_squared(sheep_pos)
+                        <= player.bark_radius * player.bark_radius
+                    {
+                        sheep.become_spooked(player_pos);
+                    }
+                }
+            }
+        }
+    }
+}
 
 fn record_player_directional_input(
     input: Res<ButtonInput<KeyCode>>,
