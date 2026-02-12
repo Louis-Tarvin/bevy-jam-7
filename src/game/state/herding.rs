@@ -4,7 +4,7 @@ use crate::{
     AppSystems, PausableSystems,
     game::{
         camera::CameraTarget,
-        player::player,
+        player::{PlayerAssets, player},
         sheep::{SheepAssets, sheep},
         state::{GamePhase, GameState},
     },
@@ -45,9 +45,9 @@ pub fn tick_countdown(
 pub fn on_herding(
     mut commands: Commands,
     sheep_assets: Res<SheepAssets>,
+    player_assets: Res<PlayerAssets>,
     game_state: Res<GameState>,
     mut camera_target: ResMut<CameraTarget>,
-    meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let count = game_state.sheep_count as usize;
@@ -64,12 +64,18 @@ pub fn on_herding(
         let x = (i % grid) as f32;
         let z = (i / grid) as f32;
         let pos = Vec3::new((x - offset) * spacing, 0.0, (z - offset) * spacing);
-        commands.spawn((sheep(&sheep_assets, pos), DespawnOnExit(GamePhase::Herding)));
+        commands.spawn((
+            sheep(&sheep_assets, pos, &game_state),
+            DespawnOnExit(GamePhase::Herding),
+        ));
     }
 
     // spawn player
     let player = commands
-        .spawn((player(meshes, materials), DespawnOnExit(GamePhase::Herding)))
+        .spawn((
+            player(&player_assets, materials),
+            DespawnOnExit(GamePhase::Herding),
+        ))
         .id();
     camera_target.0 = Some(player);
 

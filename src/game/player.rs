@@ -1,11 +1,11 @@
 //! Player-specific behavior.
 
-use bevy::prelude::*;
+use bevy::{light::NotShadowCaster, prelude::*};
 
 use crate::{
     AppSystems, PausableSystems,
     asset_tracking::LoadResource,
-    game::{movement::HopMovementController, sheep::Sheep},
+    game::{modifiers::Modifier, movement::HopMovementController, sheep::Sheep, state::GameState},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -23,17 +23,23 @@ pub(super) fn plugin(app: &mut App) {
             .in_set(AppSystems::TickTimers)
             .in_set(PausableSystems),
     );
+    app.add_systems(
+        Update,
+        init_player_gear_visuals
+            .in_set(AppSystems::Update)
+            .in_set(PausableSystems),
+    );
 }
 
 /// The player character.
 pub fn player(
-    mut meshes: ResMut<Assets<Mesh>>,
+    player_assets: &PlayerAssets,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) -> impl Bundle {
     (
         Name::new("Player"),
         Player::default(),
-        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+        SceneRoot(player_assets.scene.clone()),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.5, 0.0),
         HopMovementController::new(3.0, 1.0, 0.1, 0.2),
@@ -116,11 +122,57 @@ fn record_player_directional_input(
     }
 }
 
+fn init_player_gear_visuals(
+    game_state: Res<GameState>,
+    mut commands: Commands,
+    gear_query: Query<(Entity, &Name), (Without<Player>, Added<Name>)>,
+    parent_query: Query<&ChildOf>,
+    player_query: Query<(), With<Player>>,
+) {
+    let show_gear = game_state.is_modifier_active(Modifier::Space);
+
+    for (entity, name) in &gear_query {
+        let is_gear = matches!(name.as_str(), "Helmet" | "Jetpack");
+        if !is_gear || !is_descendant_of_player(entity, &parent_query, &player_query) {
+            continue;
+        }
+
+        if show_gear {
+            commands.entity(entity).insert(Visibility::Visible);
+        } else {
+            commands.entity(entity).insert(Visibility::Hidden);
+        }
+
+        if name.as_str() == "Helmet" {
+            commands.entity(entity).insert(NotShadowCaster);
+        }
+    }
+}
+
+fn is_descendant_of_player(
+    mut entity: Entity,
+    parent_query: &Query<&ChildOf>,
+    player_query: &Query<(), With<Player>>,
+) -> bool {
+    loop {
+        if player_query.get(entity).is_ok() {
+            return true;
+        }
+
+        let Ok(parent) = parent_query.get(entity) else {
+            return false;
+        };
+        entity = parent.parent();
+    }
+}
+
 #[derive(Resource, Asset, Clone, Reflect)]
 #[reflect(Resource)]
 pub struct PlayerAssets {
     #[dependency]
     pub steps: Vec<Handle<AudioSource>>,
+    #[dependency]
+    pub scene: Handle<Scene>,
 }
 
 impl FromWorld for PlayerAssets {
@@ -133,6 +185,7 @@ impl FromWorld for PlayerAssets {
                 assets.load("audio/sound_effects/step3.ogg"),
                 assets.load("audio/sound_effects/step4.ogg"),
             ],
+            scene: assets.load("obj/dog.glb#Scene0"),
         }
     }
 }

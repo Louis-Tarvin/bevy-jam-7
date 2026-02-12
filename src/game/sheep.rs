@@ -10,6 +10,7 @@ use crate::{
     asset_tracking::LoadResource,
     game::{
         level::{GOAL_RADIUS, GoalLocation, LevelBounds},
+        modifiers::Modifier,
         movement::HopMovementController,
         player::Player,
         state::GameState,
@@ -54,7 +55,7 @@ pub struct Sheep {
 
 impl Sheep {
     fn new() -> Self {
-        let mut wander = Self {
+        let mut sheep = Self {
             state: SheepState::Wander(Timer::from_seconds(1.0, TimerMode::Once)),
             step_distance: 2.0,
             min_wait: 1.5,
@@ -62,8 +63,23 @@ impl Sheep {
             default_speed_mult: 1.0,
             spooked_speed_mult: 2.0,
         };
-        wander.reset_timer();
-        wander
+        sheep.reset_timer();
+        sheep
+    }
+
+    fn default_speed_mult(mut self, mult: f32) -> Self {
+        self.default_speed_mult = mult;
+        self
+    }
+
+    fn spooked_speed_mult(mut self, mult: f32) -> Self {
+        self.spooked_speed_mult = mult;
+        self
+    }
+
+    fn step_distance(mut self, dist: f32) -> Self {
+        self.step_distance = dist;
+        self
     }
 
     fn reset_timer(&mut self) {
@@ -101,11 +117,38 @@ impl FromWorld for SheepAssets {
     }
 }
 
-pub fn sheep(sheep_assets: &SheepAssets, position: Vec3) -> impl Bundle {
+pub fn sheep(sheep_assets: &SheepAssets, position: Vec3, state: &GameState) -> impl Bundle {
+    let mut move_speed_mult = 1.0;
+    let mut hop_speed_mult = 1.0;
+    let mut time_between_hops = 0.2;
+    let mut hop_time_length = 0.3;
+    let mut jump_height_mult = 1.0;
+
+    if state.is_modifier_active(Modifier::MoonGravity) {
+        hop_speed_mult *= 0.8;
+        // move_speed_mult *= 0.8;
+        hop_time_length += 0.5;
+        jump_height_mult *= 6.0;
+    }
+    if state.is_modifier_active(Modifier::HyperSheep) {
+        hop_speed_mult *= 1.3;
+        move_speed_mult *= 1.3;
+        time_between_hops *= 0.1;
+    }
     (
         Name::new("Sheep"),
-        Sheep::new(),
-        HopMovementController::default(),
+        HopMovementController {
+            move_speed_mult,
+            hop_speed_mult,
+            time_between_hops,
+            hop_time_length,
+            jump_height_mult,
+            ..Default::default()
+        },
+        Sheep::new()
+            .default_speed_mult(move_speed_mult)
+            .spooked_speed_mult(move_speed_mult * 2.0)
+            .step_distance(move_speed_mult * 2.0),
         SceneRoot(sheep_assets.scene.clone()),
         Transform::from_translation(position),
         DespawnOnExit(Screen::Gameplay),
@@ -142,7 +185,7 @@ fn sheep_state_update(
         let pos = transform.translation.xz();
         match sheep.state {
             SheepState::Wander(_) => {
-                controller.hop_speed_mult = sheep.default_speed_mult;
+                controller.move_speed_mult = sheep.default_speed_mult;
                 for player_transform in player_query {
                     let player_pos = player_transform.translation.xz();
                     if pos.distance(player_pos) < SHEEP_INTERACT_RANGE {
@@ -150,14 +193,20 @@ fn sheep_state_update(
                     }
                 }
             }
-            SheepState::Evading(danger_pos) => {
+            SheepState::Evading(mut danger_pos) => {
+                for player_transform in player_query {
+                    let player_pos = player_transform.translation.xz();
+                    if pos.distance(player_pos) < SHEEP_INTERACT_RANGE {
+                        danger_pos = player_pos;
+                    }
+                }
                 if pos.distance(danger_pos) >= SHEEP_INTERACT_RANGE {
                     sheep.state = SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
                     sheep.reset_timer();
                 } else {
                     let preferred = (pos - danger_pos).normalize_or(Vec2::X);
                     let dir = pick_evasion_dir(pos, preferred, &bounds);
-                    controller.hop_speed_mult = sheep.default_speed_mult;
+                    controller.move_speed_mult = sheep.default_speed_mult;
                     controller.apply_movement(dir * time.delta_secs() * sheep.step_distance);
                 }
             }
@@ -167,7 +216,7 @@ fn sheep_state_update(
                     sheep.reset_timer();
                 } else {
                     let dir = (pos - danger_pos).normalize_or(Vec2::X);
-                    controller.hop_speed_mult = sheep.spooked_speed_mult;
+                    controller.move_speed_mult = sheep.spooked_speed_mult;
                     controller.apply_movement(dir * time.delta_secs() * sheep.step_distance);
                 }
             }

@@ -39,6 +39,7 @@ pub struct HopMovementController {
     pub hop_speed_mult: f32,
     pub time_between_hops: f32,
     pub hop_time_length: f32,
+    pub jump_height_mult: f32,
     pub airborne: bool,
     pub timer: Timer,
 }
@@ -70,6 +71,7 @@ impl Default for HopMovementController {
             hop_speed_mult: 1.0,
             time_between_hops: 0.2,
             hop_time_length: 0.3,
+            jump_height_mult: 1.0,
             airborne: false,
             timer: Timer::from_seconds(0.5, TimerMode::Once),
         }
@@ -141,7 +143,8 @@ fn apply_hop_movement(
                 let y = lerp(src.y..=dest.y, controller.timer.fraction());
                 transform.translation.x = x;
                 transform.translation.z = y;
-                transform.translation.y = jump_height(controller.timer.fraction());
+                transform.translation.y =
+                    jump_height(controller.timer.fraction()) * controller.jump_height_mult;
             }
         }
         if just_hopped {

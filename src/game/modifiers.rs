@@ -8,8 +8,9 @@ use rand::{
 pub enum Modifier {
     HyperSheep,
     MoonGravity,
-    Placeholder1,
-    Placeholder2,
+    Ufo,
+    Space,
+    TeleportingBark,
 }
 
 impl Modifier {
@@ -17,8 +18,9 @@ impl Modifier {
         match self {
             Modifier::HyperSheep => "Hyper Sheep",
             Modifier::MoonGravity => "Moon Gravity",
-            Modifier::Placeholder1 => "Placeholder 1",
-            Modifier::Placeholder2 => "Placeholder 2",
+            Modifier::Ufo => "UFO",
+            Modifier::Space => "Space",
+            Modifier::TeleportingBark => "Teleporting Bark",
         }
     }
 
@@ -26,8 +28,11 @@ impl Modifier {
         match self {
             Modifier::HyperSheep => "Sheep move faster and hop higher.",
             Modifier::MoonGravity => "Lower gravity makes sheep floaty.",
-            Modifier::Placeholder1 => "Placeholder modifier.",
-            Modifier::Placeholder2 => "Placeholder modifier.",
+            Modifier::Ufo => "A UFO will fly around and occasionally abduct a sheep.",
+            Modifier::Space => "You fly around with floaty, frictionless movement.",
+            Modifier::TeleportingBark => {
+                "Every time you bark you'll be teleported to a random location."
+            }
         }
     }
 
@@ -36,8 +41,9 @@ impl Modifier {
         match self {
             Modifier::HyperSheep => Easy,
             Modifier::MoonGravity => Medium,
-            Modifier::Placeholder1 => Hard,
-            Modifier::Placeholder2 => Easy,
+            Modifier::Ufo => Hard,
+            Modifier::Space => Hard,
+            Modifier::TeleportingBark => Hard,
         }
     }
 }
@@ -47,8 +53,8 @@ impl Distribution<Modifier> for StandardUniform {
         match rng.random_range(0..4) {
             0 => Modifier::HyperSheep,
             1 => Modifier::MoonGravity,
-            2 => Modifier::Placeholder1,
-            _ => Modifier::Placeholder2,
+            2 => Modifier::Ufo,
+            _ => Modifier::Space,
         }
     }
 }
