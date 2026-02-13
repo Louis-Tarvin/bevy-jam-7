@@ -16,11 +16,43 @@ use crate::{
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (apply_hop_movement)
+        (apply_hop_movement, apply_space_movement)
             .chain()
             .in_set(AppSystems::Update)
             .in_set(PausableSystems),
     );
+}
+
+/// Generic movement input and speed settings shared across movement behaviors.
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+#[require(Transform)]
+pub struct MovementController {
+    /// Desired movement vector or target on the x,z plane.
+    pub intent: Vec2,
+    pub move_speed_mult: f32,
+}
+
+impl MovementController {
+    pub fn new(move_speed_mult: f32) -> Self {
+        Self {
+            move_speed_mult,
+            ..Default::default()
+        }
+    }
+
+    pub fn apply_movement(&mut self, direction: Vec2) {
+        self.intent += direction * self.move_speed_mult;
+    }
+}
+
+impl Default for MovementController {
+    fn default() -> Self {
+        Self {
+            intent: Vec2::ZERO,
+            move_speed_mult: 3.0,
+        }
+    }
 }
 
 /// These are the movement parameters for our character controller.
@@ -29,13 +61,10 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[component(on_add)]
-#[require(Transform)]
+#[require(Transform, MovementController)]
 pub struct HopMovementController {
-    /// Desired location on x,z plane
-    pub intent: Vec2,
     pub current_hop_src: Option<Vec2>,
     pub current_hop_dest: Option<Vec2>,
-    pub move_speed_mult: f32,
     pub hop_speed_mult: f32,
     pub time_between_hops: f32,
     pub hop_time_length: f32,
@@ -45,14 +74,8 @@ pub struct HopMovementController {
 }
 
 impl HopMovementController {
-    pub fn new(
-        move_speed_mult: f32,
-        hop_speed_mult: f32,
-        time_between_hops: f32,
-        hop_time_length: f32,
-    ) -> Self {
+    pub fn new(hop_speed_mult: f32, time_between_hops: f32, hop_time_length: f32) -> Self {
         Self {
-            move_speed_mult,
             hop_speed_mult,
             time_between_hops,
             hop_time_length,
@@ -64,10 +87,8 @@ impl HopMovementController {
 impl Default for HopMovementController {
     fn default() -> Self {
         Self {
-            intent: Vec2::ZERO,
             current_hop_src: None,
             current_hop_dest: None,
-            move_speed_mult: 3.0,
             hop_speed_mult: 1.0,
             time_between_hops: 0.2,
             hop_time_length: 0.3,
@@ -80,22 +101,23 @@ impl Default for HopMovementController {
 
 impl HopMovementController {
     fn on_add(mut world: DeferredWorld, context: HookContext) {
-        // Initialise intent to the spawned position
+        // Initialise intent to the spawned position.
         let pos = world
             .get::<Transform>(context.entity)
             .unwrap()
             .translation
             .xz();
-        let mut entity = world.get_mut::<Self>(context.entity).unwrap();
-        entity.intent = pos;
-    }
-
-    pub fn apply_movement(&mut self, direction: Vec2) {
-        self.intent += direction * self.move_speed_mult;
+        let mut movement = world.get_mut::<MovementController>(context.entity).unwrap();
+        movement.intent = pos;
     }
 
     /// Returns true if just started a hop
-    pub fn update(&mut self, delta_secs: f32, current_pos: Vec2) -> bool {
+    pub fn update(
+        &mut self,
+        delta_secs: f32,
+        movement: &MovementController,
+        current_pos: Vec2,
+    ) -> bool {
         self.timer
             .tick(Duration::from_secs_f32(delta_secs * self.hop_speed_mult));
         if self.timer.is_finished() {
@@ -107,14 +129,14 @@ impl HopMovementController {
                 self.timer.reset();
             } else {
                 // check that intent is sufficiently far to justify a hop
-                if self.intent.distance_squared(current_pos) > 0.4 {
+                if movement.intent.distance_squared(current_pos) > 0.4 {
                     // Begin hop
                     self.airborne = true;
                     self.timer
                         .set_duration(Duration::from_secs_f32(self.hop_time_length));
                     self.timer.reset();
                     self.current_hop_src = Some(current_pos);
-                    self.current_hop_dest = Some(self.intent);
+                    self.current_hop_dest = Some(movement.intent);
                     return true;
                 }
             }
@@ -123,16 +145,70 @@ impl HopMovementController {
     }
 }
 
+/// Frictionless Newtonian movement on the x,z plane.
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+#[component(on_add)]
+#[require(Transform, MovementController)]
+pub struct SpaceMovementController {
+    /// Current planar velocity.
+    pub velocity: Vec2,
+    pub max_speed: f32,
+}
+
+impl SpaceMovementController {
+    pub fn new(max_speed: f32) -> Self {
+        Self {
+            max_speed,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for SpaceMovementController {
+    fn default() -> Self {
+        Self {
+            velocity: Vec2::ZERO,
+            max_speed: 12.0,
+        }
+    }
+}
+
+impl SpaceMovementController {
+    fn on_add(mut world: DeferredWorld, context: HookContext) {
+        let mut movement = world.get_mut::<MovementController>(context.entity).unwrap();
+        movement.intent = Vec2::ZERO;
+    }
+
+    pub fn update(
+        &mut self,
+        delta_secs: f32,
+        movement: &mut MovementController,
+        _current_pos: Vec2,
+    ) {
+        self.velocity += movement.intent * delta_secs;
+        movement.intent = Vec2::ZERO;
+        if self.max_speed > 0.0 {
+            self.velocity = self.velocity.clamp_length_max(self.max_speed);
+        }
+    }
+}
+
 fn apply_hop_movement(
     time: Res<Time>,
-    mut movement_query: Query<(&mut HopMovementController, &mut Transform)>,
+    mut movement_query: Query<(
+        &mut MovementController,
+        &mut HopMovementController,
+        &mut Transform,
+    )>,
     player_assets: If<Res<PlayerAssets>>,
     mut commands: Commands,
     bounds: Res<LevelBounds>,
 ) {
-    for (mut controller, mut transform) in &mut movement_query {
-        controller.intent = bounds.clamp_to_bounds(controller.intent);
-        let just_hopped = controller.update(time.delta_secs(), transform.translation.xz());
+    for (mut movement, mut controller, mut transform) in &mut movement_query {
+        movement.intent = bounds.clamp_to_bounds(movement.intent);
+        let just_hopped =
+            controller.update(time.delta_secs(), &movement, transform.translation.xz());
         if controller.airborne {
             // Lerp from source to destination
             if let (Some(src), Some(dest)) =
@@ -163,6 +239,40 @@ fn apply_hop_movement(
             let random_step = player_assets.steps.choose(rng).unwrap().clone();
             commands.spawn(sound_effect_3d(random_step, transform.translation));
         }
+    }
+}
+
+fn apply_space_movement(
+    time: Res<Time>,
+    mut movement_query: Query<
+        (
+            &mut MovementController,
+            &mut SpaceMovementController,
+            &mut Transform,
+        ),
+        Without<HopMovementController>,
+    >,
+    bounds: Res<LevelBounds>,
+) {
+    const SPEED_MULT: f32 = 200.0;
+    const HOVER_HEIGHT: f32 = 1.0;
+    for (mut movement, mut controller, mut transform) in &mut movement_query {
+        controller.update(time.delta_secs(), &mut movement, transform.translation.xz());
+
+        let delta = controller.velocity * time.delta_secs() * SPEED_MULT;
+        let next_pos = transform.translation.xz() + delta;
+        let clamped = bounds.clamp_to_bounds(next_pos);
+
+        if (clamped.x - next_pos.x).abs() > f32::EPSILON {
+            controller.velocity.x = 0.0;
+        }
+        if (clamped.y - next_pos.y).abs() > f32::EPSILON {
+            controller.velocity.y = 0.0;
+        }
+
+        transform.translation.x = clamped.x;
+        transform.translation.z = clamped.y;
+        transform.translation.y = HOVER_HEIGHT;
     }
 }
 

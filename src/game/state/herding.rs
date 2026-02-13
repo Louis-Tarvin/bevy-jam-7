@@ -4,6 +4,8 @@ use crate::{
     AppSystems, PausableSystems,
     game::{
         camera::CameraTarget,
+        modifiers::Modifier,
+        movement::{HopMovementController, SpaceMovementController},
         player::{PlayerAssets, player},
         sheep::{SheepAssets, sheep},
         state::{GamePhase, GameState},
@@ -48,7 +50,6 @@ pub fn on_herding(
     player_assets: Res<PlayerAssets>,
     game_state: Res<GameState>,
     mut camera_target: ResMut<CameraTarget>,
-    materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let count = game_state.sheep_count as usize;
     if count == 0 {
@@ -72,11 +73,17 @@ pub fn on_herding(
 
     // spawn player
     let player = commands
-        .spawn((
-            player(&player_assets, materials),
-            DespawnOnExit(GamePhase::Herding),
-        ))
+        .spawn((player(&player_assets), DespawnOnExit(GamePhase::Herding)))
         .id();
+    if game_state.is_modifier_active(Modifier::Space) {
+        commands
+            .entity(player)
+            .insert(SpaceMovementController::new(20.0));
+    } else {
+        commands
+            .entity(player)
+            .insert(HopMovementController::new(1.0, 0.1, 0.2));
+    }
     camera_target.0 = Some(player);
 
     draw_herding_ui(&mut commands);

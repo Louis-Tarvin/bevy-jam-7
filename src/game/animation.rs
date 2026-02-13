@@ -11,7 +11,7 @@ use std::time::Duration;
 use crate::{
     AppSystems, PausableSystems,
     audio::sound_effect,
-    game::{movement::HopMovementController, player::PlayerAssets},
+    game::{movement::MovementController, player::PlayerAssets},
 };
 
 pub(super) fn plugin(app: &mut App) {

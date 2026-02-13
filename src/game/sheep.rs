@@ -11,20 +11,26 @@ use crate::{
     game::{
         level::{GOAL_RADIUS, GoalLocation, LevelBounds},
         modifiers::Modifier,
-        movement::HopMovementController,
+        movement::{HopMovementController, MovementController},
         player::Player,
         state::GameState,
+        ufo::UFO_HEIGHT,
     },
     screens::Screen,
 };
 
 const SHEEP_INTERACT_RANGE: f32 = 5.0;
+const ABDUCTION_ASCENT_SPEED: f32 = 6.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.load_resource::<SheepAssets>();
     app.add_systems(
         Update,
-        (sheep_goal_check, sheep_state_update, sheep_wander)
+        (
+            sheep_goal_check,
+            sheep_state_update,
+            (sheep_wander, sheep_abduction_update),
+        )
             .chain()
             .in_set(AppSystems::Update)
             .in_set(PausableSystems),
@@ -40,6 +46,8 @@ pub enum SheepState {
     Spooked(Vec2),
     /// Near the goal - move towards it
     BeingCounted,
+    /// Targeted by UFO - rise into the sky.
+    BeingAbducted,
 }
 
 #[derive(Component, Debug, Clone, PartialEq, Reflect)]
@@ -99,6 +107,18 @@ impl Sheep {
             _ => {}
         }
     }
+
+    pub fn is_being_abducted(&self) -> bool {
+        matches!(self.state, SheepState::BeingAbducted)
+    }
+
+    pub fn start_abduction(&mut self) -> bool {
+        if self.is_being_abducted() {
+            return false;
+        }
+        self.state = SheepState::BeingAbducted;
+        true
+    }
 }
 
 #[derive(Resource, Asset, Clone, Reflect)]
@@ -137,8 +157,8 @@ pub fn sheep(sheep_assets: &SheepAssets, position: Vec3, state: &GameState) -> i
     }
     (
         Name::new("Sheep"),
+        MovementController::new(move_speed_mult),
         HopMovementController {
-            move_speed_mult,
             hop_speed_mult,
             time_between_hops,
             hop_time_length,
@@ -157,9 +177,9 @@ pub fn sheep(sheep_assets: &SheepAssets, position: Vec3, state: &GameState) -> i
 
 fn sheep_wander(
     time: Res<Time>,
-    mut sheep_query: Query<(&mut HopMovementController, &Transform, &mut Sheep)>,
+    mut sheep_query: Query<(&mut MovementController, &Transform, &mut Sheep)>,
 ) {
-    for (mut controller, transform, mut sheep) in &mut sheep_query {
+    for (mut movement, transform, mut sheep) in &mut sheep_query {
         if let SheepState::Wander(timer) = &mut sheep.state {
             timer.tick(time.delta());
             if timer.just_finished() {
@@ -167,7 +187,7 @@ fn sheep_wander(
                 let angle = rng.random_range(0.0..std::f32::consts::TAU);
                 let dir = Vec2::from_angle(angle);
                 let target = transform.translation.xz() + dir * sheep.step_distance;
-                controller.intent = target;
+                movement.intent = target;
                 sheep.reset_timer();
             }
         }
@@ -176,16 +196,21 @@ fn sheep_wander(
 
 fn sheep_state_update(
     time: Res<Time>,
-    mut sheep_query: Query<(&mut HopMovementController, &Transform, &mut Sheep)>,
+    mut sheep_query: Query<(
+        &mut MovementController,
+        &mut HopMovementController,
+        &Transform,
+        &mut Sheep,
+    )>,
     player_query: Query<&Transform, With<Player>>,
     goal_query: Query<&Transform, (With<GoalLocation>, Without<Player>)>,
     bounds: Res<LevelBounds>,
 ) {
-    for (mut controller, transform, mut sheep) in &mut sheep_query {
+    for (mut movement, mut controller, transform, mut sheep) in &mut sheep_query {
         let pos = transform.translation.xz();
         match sheep.state {
             SheepState::Wander(_) => {
-                controller.move_speed_mult = sheep.default_speed_mult;
+                movement.move_speed_mult = sheep.default_speed_mult;
                 for player_transform in player_query {
                     let player_pos = player_transform.translation.xz();
                     if pos.distance(player_pos) < SHEEP_INTERACT_RANGE {
@@ -206,8 +231,8 @@ fn sheep_state_update(
                 } else {
                     let preferred = (pos - danger_pos).normalize_or(Vec2::X);
                     let dir = pick_evasion_dir(pos, preferred, &bounds);
-                    controller.move_speed_mult = sheep.default_speed_mult;
-                    controller.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                    movement.move_speed_mult = sheep.default_speed_mult;
+                    movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
                 }
             }
             SheepState::Spooked(danger_pos) => {
@@ -216,17 +241,39 @@ fn sheep_state_update(
                     sheep.reset_timer();
                 } else {
                     let dir = (pos - danger_pos).normalize_or(Vec2::X);
-                    controller.move_speed_mult = sheep.spooked_speed_mult;
-                    controller.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                    movement.move_speed_mult = sheep.spooked_speed_mult;
+                    movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
                 }
             }
             SheepState::BeingCounted => {
                 let goal_pos = goal_query.single().unwrap().translation.xz();
                 let dir = (goal_pos - pos).normalize_or(Vec2::X);
                 controller.hop_speed_mult = 0.8;
-                controller.move_speed_mult = 0.8;
-                controller.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                movement.move_speed_mult = 0.8;
+                movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
             }
+            SheepState::BeingAbducted => {
+                movement.intent = transform.translation.xz();
+            }
+        }
+    }
+}
+
+fn sheep_abduction_update(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut sheep_query: Query<(Entity, &mut Transform, &Sheep)>,
+) {
+    for (entity, mut transform, sheep) in &mut sheep_query {
+        if !sheep.is_being_abducted() {
+            continue;
+        }
+
+        transform.translation.y =
+            (transform.translation.y + ABDUCTION_ASCENT_SPEED * time.delta_secs()).min(UFO_HEIGHT);
+
+        if transform.translation.y >= UFO_HEIGHT - 2.0 {
+            commands.entity(entity).despawn();
         }
     }
 }
@@ -240,15 +287,18 @@ fn sheep_goal_check(
     let goal_pos = goal_query.translation.xz();
     for (entity, sheep_transform, mut sheep) in sheep_query {
         let pos = sheep_transform.translation.xz();
-        if let SheepState::BeingCounted = sheep.state {
-            if pos.distance_squared(goal_pos) < 1.5 {
-                state.points += 1;
-                info!("Points: {}", state.points);
-                commands.entity(entity).despawn();
+        match sheep.state {
+            SheepState::BeingAbducted => {}
+            SheepState::BeingCounted => {
+                if pos.distance_squared(goal_pos) < 1.5 {
+                    state.points += 1;
+                    commands.entity(entity).despawn();
+                }
             }
-        } else {
-            if pos.distance_squared(goal_pos) < GOAL_RADIUS * GOAL_RADIUS {
-                sheep.state = SheepState::BeingCounted;
+            _ => {
+                if pos.distance_squared(goal_pos) < GOAL_RADIUS * GOAL_RADIUS {
+                    sheep.state = SheepState::BeingCounted;
+                }
             }
         }
     }

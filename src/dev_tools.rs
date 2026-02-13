@@ -9,7 +9,7 @@ use bevy::{
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
 use crate::{
-    game::{level::LevelBounds, movement::HopMovementController, state::GamePhase},
+    game::{level::LevelBounds, movement::MovementController, state::GamePhase},
     screens::Screen,
 };
 
@@ -102,7 +102,7 @@ fn draw_level_bounds(
 fn draw_movement_intents(
     mut gizmos: Gizmos,
     debug_gizmo_overlay: Res<DebugGizmoOverlay>,
-    controllers: Query<(&Transform, &HopMovementController)>,
+    controllers: Query<(&Transform, &MovementController)>,
 ) {
     if !debug_gizmo_overlay.enabled {
         return;

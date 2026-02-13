@@ -5,7 +5,7 @@ use bevy::{light::NotShadowCaster, prelude::*};
 use crate::{
     AppSystems, PausableSystems,
     asset_tracking::LoadResource,
-    game::{modifiers::Modifier, movement::HopMovementController, sheep::Sheep, state::GameState},
+    game::{modifiers::Modifier, movement::MovementController, sheep::Sheep, state::GameState},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -32,17 +32,13 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 /// The player character.
-pub fn player(
-    player_assets: &PlayerAssets,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) -> impl Bundle {
+pub fn player(player_assets: &PlayerAssets) -> impl Bundle {
     (
         Name::new("Player"),
         Player::default(),
         SceneRoot(player_assets.scene.clone()),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-        Transform::from_xyz(0.0, 0.5, 0.0),
-        HopMovementController::new(3.0, 1.0, 0.1, 0.2),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+        MovementController::new(3.0),
         SpatialListener::new(0.2),
     )
 }
@@ -94,7 +90,7 @@ fn handle_bark(
 fn record_player_directional_input(
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut controller_query: Query<&mut HopMovementController, With<Player>>,
+    mut controller_query: Query<&mut MovementController, With<Player>>,
 ) {
     // Collect directional input.
     let mut intent = Vec2::ZERO;

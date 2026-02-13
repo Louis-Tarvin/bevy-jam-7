@@ -37,6 +37,8 @@ pub struct LevelAssets {
     // music: Handle<AudioSource>,
     #[dependency]
     arena: Handle<Scene>,
+    #[dependency]
+    ufo: Handle<Scene>,
 }
 
 impl FromWorld for LevelAssets {
@@ -45,6 +47,7 @@ impl FromWorld for LevelAssets {
         Self {
             // music: assets.load("audio/music/Fluffing A Duck.ogg"),
             arena: assets.load("obj/arena.glb#Scene0"),
+            ufo: assets.load("obj/ufo.glb#Scene0"),
         }
     }
 }
@@ -86,7 +89,7 @@ pub fn spawn_level(
                     color: Color::srgb(0.284, 0.358, 0.659),
                     ..Default::default()
                 },
-                Transform::from_xyz(0.5, 0.3, 1.0).looking_at(Vec3::ZERO, Vec3::Y)
+                Transform::from_xyz(0.5, 1.5, 0.5).looking_at(Vec3::ZERO, Vec3::Y)
             ),
             (
                 Name::new("Goal"),
