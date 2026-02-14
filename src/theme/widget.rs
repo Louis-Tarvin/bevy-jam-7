@@ -104,10 +104,47 @@ where
 {
     button_base(
         text,
+        40.0,
         action,
         Node {
             width: px(380),
             height: px(80),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            border_radius: BorderRadius::MAX,
+            ..default()
+        },
+    )
+}
+
+pub fn button_medium<E, B, M, I>(text: impl Into<String>, action: I) -> impl Bundle
+where
+    E: EntityEvent,
+    B: Bundle,
+    I: IntoObserverSystem<E, B, M>,
+{
+    button_base(
+        text,
+        20.0,
+        action,
+        Node {
+            width: px(150),
+            height: px(40),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            border_radius: BorderRadius::MAX,
+            ..default()
+        },
+    )
+}
+
+pub fn button_medium_disabled(text: impl Into<String>) -> impl Bundle {
+    button_disabled(
+        text,
+        20.0,
+        Node {
+            width: px(150),
+            height: px(40),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             border_radius: BorderRadius::MAX,
@@ -125,6 +162,7 @@ where
 {
     button_base(
         text,
+        40.0,
         action,
         Node {
             width: px(30),
@@ -139,6 +177,7 @@ where
 /// A simple button with text and an action defined as an [`Observer`]. The button's layout is provided by `button_bundle`.
 fn button_base<E, B, M, I>(
     text: impl Into<String>,
+    font_size: f32,
     action: I,
     button_bundle: impl Bundle,
 ) -> impl Bundle
@@ -152,7 +191,7 @@ where
     (
         Name::new("Button"),
         Node::default(),
-        Children::spawn(SpawnWith(|parent: &mut ChildSpawner| {
+        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent
                 .spawn((
                     Name::new("Button Inner"),
@@ -166,7 +205,7 @@ where
                     children![(
                         Name::new("Button Text"),
                         Text(text),
-                        TextFont::from_font_size(40.0),
+                        TextFont::from_font_size(font_size),
                         TextColor(BUTTON_TEXT),
                         // Don't bubble picking events from the text up to the button.
                         Pickable::IGNORE,
@@ -175,5 +214,30 @@ where
                 .insert(button_bundle)
                 .observe(action);
         })),
+    )
+}
+
+/// A disabled button with text and no interaction.
+fn button_disabled(
+    text: impl Into<String>,
+    font_size: f32,
+    button_bundle: impl Bundle,
+) -> impl Bundle {
+    (
+        Name::new("Button"),
+        Node::default(),
+        children![(
+            Name::new("Button Inner"),
+            BackgroundColor(BUTTON_BACKGROUND.with_alpha(0.4)),
+            button_bundle,
+            Pickable::IGNORE,
+            children![(
+                Name::new("Button Text"),
+                Text(text.into()),
+                TextFont::from_font_size(font_size),
+                TextColor(BUTTON_TEXT.with_alpha(0.55)),
+                Pickable::IGNORE,
+            )],
+        )],
     )
 }

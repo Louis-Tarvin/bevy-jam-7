@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use rand::{Rng, seq::SliceRandom};
+use rand::Rng;
 
 use crate::{
     AppSystems, PausableSystems,

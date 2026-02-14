@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 use rand::Rng;
 
-use crate::{game::modifiers::Modifier, screens::Screen};
+use crate::{
+    game::{modifiers::Modifier, state::shop::items::Charm},
+    screens::Screen,
+};
 
 mod herding;
 mod modifier_choice;
@@ -33,6 +36,8 @@ pub struct GameState {
     pub point_target: u32,
     pub active_modifiers: Vec<Modifier>,
     pub money: u32,
+    pub charms: Vec<Charm>,
+    pub max_charms: u8,
 }
 
 impl Default for GameState {
@@ -46,6 +51,8 @@ impl Default for GameState {
             point_target: 10,
             active_modifiers: Vec::new(),
             money: 0,
+            charms: Vec::with_capacity(3),
+            max_charms: 3,
         }
     }
 }
@@ -68,6 +75,14 @@ impl GameState {
 
     pub fn is_modifier_active(&self, modifier: Modifier) -> bool {
         self.active_modifiers.contains(&modifier)
+    }
+
+    pub fn is_charm_active(&self, charm: Charm) -> bool {
+        self.charms.contains(&charm)
+    }
+
+    pub fn charms_full(&self) -> bool {
+        self.charms.len() >= self.max_charms as usize
     }
 
     fn pick_random_modifiers(&self, count: usize) -> Vec<Modifier> {

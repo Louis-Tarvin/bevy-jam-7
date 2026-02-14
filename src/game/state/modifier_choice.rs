@@ -18,10 +18,10 @@ fn on_modifier_choice(mut commands: Commands, mut game_state: ResMut<GameState>)
         modifier_choices,
     } = game_state.new_round();
 
-    draw_interlude_ui(&mut commands, removed_modifier, &modifier_choices);
+    draw_choice_ui(&mut commands, removed_modifier, &modifier_choices);
 }
 
-fn draw_interlude_ui(
+fn draw_choice_ui(
     commands: &mut Commands,
     removed_modifier: Option<Modifier>,
     modifier_choices: &[Modifier],
@@ -103,7 +103,7 @@ fn modifier_card(modifier: Modifier) -> impl Bundle {
                 TextColor(ui_palette::LABEL_TEXT),
                 TextLayout::new_with_justify(Justify::Center),
             ),
-            widget::button(
+            widget::button_medium(
                 "Choose",
                 move |_: On<Pointer<Click>>,
                       mut next_state: ResMut<NextState<GamePhase>>,
