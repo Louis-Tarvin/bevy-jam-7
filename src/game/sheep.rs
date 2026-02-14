@@ -1,6 +1,6 @@
 //! Sheep behavior and spawning.
 
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use bevy::{gltf::GltfMaterialName, math::ops::floor, prelude::*, scene::SceneInstanceReady};
 use rand::Rng;
@@ -20,6 +20,18 @@ use crate::{
 };
 
 const ABDUCTION_ASCENT_SPEED: f32 = 6.0;
+const HERD_RADIUS: f32 = 10.0;
+const HERD_RADIUS_SQ: f32 = HERD_RADIUS * HERD_RADIUS;
+const HERD_SEPARATION_RADIUS: f32 = 2.4;
+const HERD_SEPARATION_RADIUS_SQ: f32 = HERD_SEPARATION_RADIUS * HERD_SEPARATION_RADIUS;
+const HERD_CELL_SIZE: f32 = HERD_RADIUS;
+const HERD_COHESION_WEIGHT: f32 = 0.9;
+const HERD_SEPARATION_WEIGHT: f32 = 1.5;
+const HERD_EVADE_BLEND: f32 = 0.75;
+const HERD_WANDER_JITTER: f32 = 0.35;
+const HERD_UPDATE_INTERVAL_SECS: f32 = 0.10;
+const HERD_UPDATE_BUCKETS: u64 = 4;
+const HERD_MAX_NEIGHBORS: usize = 20;
 
 pub(super) fn plugin(app: &mut App) {
     app.load_resource::<SheepAssets>();
@@ -29,7 +41,7 @@ pub(super) fn plugin(app: &mut App) {
         (
             sheep_goal_check,
             sheep_state_update,
-            (sheep_wander, sheep_abduction_update),
+            (sheep_wander, sheep_herding, sheep_abduction_update),
         )
             .chain()
             .in_set(AppSystems::Update)
@@ -70,6 +82,7 @@ pub struct Sheep {
     max_wait: f32,
     default_speed_mult: f32,
     spooked_speed_mult: f32,
+    herd_dir: Vec2,
 }
 
 impl Sheep {
@@ -79,9 +92,10 @@ impl Sheep {
             color,
             step_distance: 1.5,
             min_wait: 1.5,
-            max_wait: 5.0,
+            max_wait: 7.0,
             default_speed_mult: 1.0,
             spooked_speed_mult: 1.7,
+            herd_dir: Vec2::ZERO,
         };
         sheep.reset_timer();
         sheep
@@ -233,6 +247,7 @@ pub fn sheep(
 
 fn sheep_wander(
     time: Res<Time>,
+    bounds: Res<LevelBounds>,
     mut sheep_query: Query<(&mut MovementController, &Transform, &mut Sheep)>,
 ) {
     for (mut movement, transform, mut sheep) in &mut sheep_query {
@@ -241,8 +256,15 @@ fn sheep_wander(
             if timer.just_finished() {
                 let rng = &mut rand::rng();
                 let angle = rng.random_range(0.0..std::f32::consts::TAU);
-                let dir = Vec2::from_angle(angle);
-                let target = transform.translation.xz() + dir * sheep.step_distance;
+                let random_dir = Vec2::from_angle(angle);
+                let herd_dir = sheep.herd_dir;
+                let dir = if herd_dir == Vec2::ZERO {
+                    random_dir
+                } else {
+                    (herd_dir + random_dir * HERD_WANDER_JITTER).normalize_or(random_dir)
+                };
+                let target =
+                    bounds.clamp_to_bounds(transform.translation.xz() + dir * sheep.step_distance);
                 movement.intent = target;
                 sheep.reset_timer();
             }
@@ -287,12 +309,14 @@ fn sheep_state_update(
                     } else {
                         let preferred = (pos - danger_pos).normalize_or(Vec2::X);
                         let dir = pick_evasion_dir(pos, preferred, &bounds);
+                        let steer = (dir + sheep.herd_dir * HERD_EVADE_BLEND).normalize_or(dir);
                         movement.move_speed_mult = sheep.default_speed_mult;
-                        movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                        movement.apply_movement(steer * time.delta_secs() * sheep.step_distance);
                     }
                 }
             }
             SheepState::Spooked(danger_pos) => {
+                sheep.herd_dir = Vec2::ZERO;
                 for (_, player) in player_query {
                     if game_state.is_charm_active(Charm::WellTrained) {
                         if pos.distance(danger_pos) < player.sheep_interact_radius {
@@ -318,6 +342,7 @@ fn sheep_state_update(
                 }
             }
             SheepState::BeingCounted => {
+                sheep.herd_dir = Vec2::ZERO;
                 let goal_pos = goal_query.single().unwrap().translation.xz();
                 let dir = (goal_pos - pos).normalize_or(Vec2::X);
                 controller.hop_speed_mult = 0.8;
@@ -325,6 +350,7 @@ fn sheep_state_update(
                 movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
             }
             SheepState::BeingAbducted => {
+                sheep.herd_dir = Vec2::ZERO;
                 movement.intent = transform.translation.xz();
             }
         }
@@ -347,6 +373,105 @@ fn sheep_abduction_update(
         if transform.translation.y >= UFO_HEIGHT - 2.0 {
             commands.entity(entity).despawn();
         }
+    }
+}
+
+fn sheep_herding(
+    time: Res<Time>,
+    mut herd_timer: Local<Timer>,
+    mut herd_bucket: Local<u64>,
+    mut set: ParamSet<(
+        Query<(Entity, &Transform, &Sheep)>,
+        Query<(Entity, &Transform, &mut Sheep)>,
+    )>,
+) {
+    if herd_timer.duration().is_zero() {
+        *herd_timer = Timer::from_seconds(HERD_UPDATE_INTERVAL_SECS, TimerMode::Repeating);
+    }
+    if !herd_timer.tick(time.delta()).just_finished() {
+        return;
+    }
+
+    *herd_bucket = (*herd_bucket + 1) % HERD_UPDATE_BUCKETS;
+    let active_bucket = *herd_bucket;
+
+    let snapshot: Vec<(Entity, Vec2)> = set
+        .p0()
+        .iter()
+        .filter(|(_, _, sheep)| {
+            matches!(sheep.state, SheepState::Wander(_) | SheepState::Evading(_))
+        })
+        .map(|(entity, transform, _)| (entity, transform.translation.xz()))
+        .collect();
+    if snapshot.len() < 2 {
+        return;
+    }
+
+    let mut grid: HashMap<IVec2, Vec<usize>> = HashMap::default();
+    for (index, (_, position)) in snapshot.iter().enumerate() {
+        grid.entry(spatial_cell(*position)).or_default().push(index);
+    }
+
+    for (entity, transform, mut sheep) in &mut set.p1() {
+        if !matches!(sheep.state, SheepState::Wander(_) | SheepState::Evading(_)) {
+            continue;
+        }
+        if entity.to_bits() % HERD_UPDATE_BUCKETS != active_bucket {
+            continue;
+        }
+
+        let pos = transform.translation.xz();
+        let cell = spatial_cell(pos);
+        let mut center = Vec2::ZERO;
+        let mut nearby_count = 0.0;
+        let mut separation = Vec2::ZERO;
+        let mut sampled_neighbors = 0usize;
+
+        'neighbor_cells: for dy in -1..=1 {
+            for dx in -1..=1 {
+                let neighbor_cell = IVec2::new(cell.x + dx, cell.y + dy);
+                let Some(indices) = grid.get(&neighbor_cell) else {
+                    continue;
+                };
+
+                for &index in indices {
+                    let (other_entity, other_pos): (Entity, Vec2) = snapshot[index];
+                    if other_entity == entity {
+                        continue;
+                    }
+
+                    let offset = other_pos - pos;
+                    let dist_sq = offset.length_squared();
+                    if dist_sq > HERD_RADIUS_SQ {
+                        continue;
+                    }
+
+                    center += other_pos;
+                    nearby_count += 1.0;
+                    sampled_neighbors += 1;
+
+                    if dist_sq > 0.0 && dist_sq < HERD_SEPARATION_RADIUS_SQ {
+                        let dist = dist_sq.sqrt();
+                        let push_strength =
+                            (HERD_SEPARATION_RADIUS - dist) / HERD_SEPARATION_RADIUS;
+                        separation += (pos - other_pos).normalize_or(Vec2::X) * push_strength;
+                    }
+
+                    if sampled_neighbors >= HERD_MAX_NEIGHBORS {
+                        break 'neighbor_cells;
+                    }
+                }
+            }
+        }
+
+        if nearby_count <= 0.0 {
+            sheep.herd_dir = Vec2::ZERO;
+            continue;
+        }
+
+        let cohesion = ((center / nearby_count) - pos).normalize_or_zero() * HERD_COHESION_WEIGHT;
+        let avoid = separation.normalize_or_zero() * HERD_SEPARATION_WEIGHT;
+        sheep.herd_dir = (cohesion + avoid).normalize_or_zero();
     }
 }
 
@@ -431,6 +556,13 @@ fn pick_evasion_dir(pos: Vec2, preferred: Vec2, bounds: &LevelBounds) -> Vec2 {
     }
 
     best_dir
+}
+
+fn spatial_cell(position: Vec2) -> IVec2 {
+    IVec2::new(
+        (position.x / HERD_CELL_SIZE).floor() as i32,
+        (position.y / HERD_CELL_SIZE).floor() as i32,
+    )
 }
 
 fn apply_wool_material_on_scene_ready(
