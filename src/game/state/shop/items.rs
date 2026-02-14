@@ -123,8 +123,8 @@ impl Charm {
         match self {
             Charm::GoldenSheep => "Golden Sheep",
             Charm::HalfTimeDoubleSheep => "Frantic Herding",
-            Charm::ChanceBlueOnBuy => "Blue Chance on Buy",
-            Charm::ChanceRedOnBuy => "Red Chance on Buy",
+            Charm::ChanceBlueOnBuy => "Blue Chance",
+            Charm::ChanceRedOnBuy => "Red Chance",
         }
     }
 

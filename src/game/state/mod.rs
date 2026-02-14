@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{math::ops::floor, prelude::*};
 use rand::Rng;
 
 use crate::{
@@ -48,7 +48,7 @@ impl Default for GameState {
             red_sheep_count: 1,
             countdown: Timer::from_seconds(120.0, TimerMode::Once),
             points: 0,
-            point_target: 10,
+            point_target: 4,
             active_modifiers: Vec::new(),
             money: 0,
             charms: Vec::with_capacity(3),
@@ -61,6 +61,7 @@ impl GameState {
     pub fn new_round(&mut self) -> NewRoundInfo {
         self.countdown.reset();
         self.points = 0;
+        self.point_target = floor(self.point_target as f32 * 1.5) as u32;
         let removed_modifier = if self.active_modifiers.len() > 2 {
             Some(self.active_modifiers.remove(0))
         } else {

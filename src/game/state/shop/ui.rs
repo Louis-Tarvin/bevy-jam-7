@@ -31,55 +31,129 @@ pub fn draw_shop_ui(mut commands: Commands, game_state: &GameState, shop_offers:
         DespawnOnExit(GamePhase::Shop),
         children![(
             widget::panel(),
-            children![
-                widget::header("Active Modifiers"),
-                (
-                    widget::row(),
-                    Children::spawn(SpawnIter(active_modifiers.into_iter().map(modifier_card)))
-                ),
-                widget::divider(),
-                widget::label(format!("Charms ({}/{})", charms.len(), max_charms)),
-                (
-                    widget::row(),
-                    Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-                        if charms.is_empty() {
-                            parent.spawn(widget::label("No charms equipped"));
-                            return;
-                        }
+            children![(
+                widget::columns(),
+                children![
+                    (
+                        Name::new("Left Column"),
+                        Node {
+                            min_width: px(250),
+                            flex_grow: 1.0,
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            row_gap: px(12),
+                            ..default()
+                        },
+                        children![
+                            widget::header("Modifiers"),
+                            (
+                                Node {
+                                    flex_direction: FlexDirection::Column,
+                                    row_gap: px(8),
+                                    ..default()
+                                },
+                                Children::spawn(SpawnIter(
+                                    active_modifiers.into_iter().map(modifier_card)
+                                ))
+                            ),
+                        ]
+                    ),
+                    (
+                        Name::new("Center Column"),
+                        Node {
+                            min_width: px(450),
+                            flex_grow: 2.0,
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            row_gap: px(12),
+                            ..default()
+                        },
+                        children![
+                            widget::header("Shop"),
+                            (
+                                widget::row(),
+                                children![
+                                    widget::label(format!("Money: {}", money)),
+                                    widget::button_medium("Reroll (1)", draw_new_items),
+                                ]
+                            ),
+                            (
+                                Node {
+                                    width: percent(100),
+                                    justify_content: JustifyContent::SpaceAround,
+                                    align_items: AlignItems::Center,
+                                    flex_direction: FlexDirection::Row,
+                                    flex_wrap: FlexWrap::Wrap,
+                                    column_gap: px(10),
+                                    row_gap: px(10),
+                                    ..default()
+                                },
+                                Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+                                    for (slot, item) in offers.into_iter().enumerate() {
+                                        match item {
+                                            Some(item) => {
+                                                parent.spawn(item_card(
+                                                    slot,
+                                                    item,
+                                                    money,
+                                                    charms_full,
+                                                ));
+                                            }
+                                            None => {
+                                                parent.spawn(bought_item_card());
+                                            }
+                                        }
+                                    }
+                                })),
+                            ),
+                            widget::divider(),
+                            (
+                                widget::row(),
+                                children![
+                                    widget::label(format!(
+                                        "Total Sheep: {}",
+                                        game_state.sheep_count
+                                    )),
+                                    widget::button_medium("Buy a Sheep (1)", buy_sheep)
+                                ]
+                            ),
+                            widget::divider(),
+                            widget::label(format!("Points target: {}", point_target)),
+                            widget::button("Start", start_next_round)
+                        ]
+                    ),
+                    (
+                        Name::new("Right Column"),
+                        Node {
+                            min_width: px(250),
+                            flex_grow: 1.0,
+                            flex_direction: FlexDirection::Column,
+                            row_gap: px(12),
+                            ..default()
+                        },
+                        children![
+                            widget::label(format!("Charms ({}/{})", charms.len(), max_charms)),
+                            (
+                                Node {
+                                    flex_direction: FlexDirection::Column,
+                                    row_gap: px(8),
+                                    ..default()
+                                },
+                                Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+                                    if charms.is_empty() {
+                                        parent.spawn(widget::label("No charms equipped"));
+                                        return;
+                                    }
 
-                        for (slot, charm) in charms.into_iter().enumerate() {
-                            parent.spawn(charm_card(slot, charm));
-                        }
-                    })),
-                ),
-                widget::divider(),
-                widget::header("Shop"),
-                (
-                    widget::row(),
-                    children![
-                        widget::label(format!("Money: {}", money)),
-                        widget::button_medium("Reroll (1)", draw_new_items),
-                    ]
-                ),
-                (
-                    widget::row(),
-                    Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-                        for (slot, item) in offers.into_iter().enumerate() {
-                            match item {
-                                Some(item) => {
-                                    parent.spawn(item_card(slot, item, money, charms_full));
-                                }
-                                None => {
-                                    parent.spawn(bought_item_card());
-                                }
-                            }
-                        }
-                    })),
-                ),
-                widget::divider(),
-                widget::label(format!("Points target: {}", point_target)),
-                widget::button("Start", start_next_round)
-            ]
+                                    for (slot, charm) in charms.into_iter().enumerate() {
+                                        parent.spawn(charm_card(slot, charm));
+                                    }
+                                })),
+                            ),
+                        ]
+                    ),
+                ]
+            )]
         )],
     ));
 }
@@ -184,7 +258,6 @@ fn item_card(slot: usize, item: ItemType, money: u32, charms_full: bool) -> impl
         Node {
             width: px(250),
             max_width: percent(100),
-            height: percent(100),
             padding: UiRect::all(px(12)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::SpaceEvenly,
@@ -238,7 +311,6 @@ fn bought_item_card() -> impl Bundle {
         Node {
             width: px(250),
             max_width: percent(100),
-            height: percent(100),
             padding: UiRect::all(px(12)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
@@ -255,6 +327,14 @@ fn bought_item_card() -> impl Bundle {
             TextLayout::new_with_justify(Justify::Center),
         )],
     )
+}
+
+fn buy_sheep(_: On<Pointer<Click>>, mut game_state: ResMut<GameState>) {
+    if game_state.money < 1 {
+        return;
+    }
+    game_state.sheep_count += 1;
+    game_state.money -= 1;
 }
 
 fn buy_shop_item(slot: usize, game_state: &mut GameState, shop_offers: &mut ShopOffers) {

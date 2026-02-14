@@ -52,8 +52,9 @@ pub fn panel() -> impl Bundle {
     (
         Name::new("Panel"),
         Node {
-            width: percent(90),
-            max_width: px(1000),
+            width: percent(95),
+            min_width: px(1080),
+            max_width: px(1500),
             padding: UiRect::all(px(28)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
@@ -63,6 +64,18 @@ pub fn panel() -> impl Bundle {
             ..default()
         },
         BackgroundColor(Color::srgba(0.08, 0.08, 0.1, 0.95)),
+    )
+}
+
+pub fn columns() -> impl Bundle {
+    (
+        Name::new("Columns"),
+        Node {
+            flex_direction: FlexDirection::Row,
+            width: percent(100),
+            height: percent(100),
+            ..default()
+        },
     )
 }
 
