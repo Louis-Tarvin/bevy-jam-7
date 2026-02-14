@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use bevy::prelude::*;
+use bevy::{gltf::GltfMaterialName, math::ops::floor, prelude::*, scene::SceneInstanceReady};
 use rand::Rng;
 
 use crate::{
@@ -24,6 +24,7 @@ const ABDUCTION_ASCENT_SPEED: f32 = 6.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.load_resource::<SheepAssets>();
+    app.add_observer(apply_wool_material_on_scene_ready);
     app.add_systems(
         Update,
         (
@@ -50,10 +51,19 @@ pub enum SheepState {
     BeingAbducted,
 }
 
+#[derive(Debug, Default, Reflect, Clone, PartialEq)]
+pub enum SheepColor {
+    #[default]
+    White,
+    Blue,
+    Red,
+}
+
 #[derive(Component, Debug, Clone, PartialEq, Reflect)]
 #[reflect(Component)]
 pub struct Sheep {
     state: SheepState,
+    color: SheepColor,
     step_distance: f32,
     min_wait: f32,
     max_wait: f32,
@@ -62,9 +72,10 @@ pub struct Sheep {
 }
 
 impl Sheep {
-    fn new() -> Self {
+    fn new(color: SheepColor) -> Self {
         let mut sheep = Self {
             state: SheepState::Wander(Timer::from_seconds(1.0, TimerMode::Once)),
+            color,
             step_distance: 2.0,
             min_wait: 1.5,
             max_wait: 5.0,
@@ -126,19 +137,44 @@ impl Sheep {
 pub struct SheepAssets {
     #[dependency]
     pub scene: Handle<Scene>,
+    pub wool_white: Handle<StandardMaterial>,
+    pub wool_blue: Handle<StandardMaterial>,
+    pub wool_red: Handle<StandardMaterial>,
 }
 
 impl FromWorld for SheepAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.resource::<AssetServer>();
+        let scene = assets.load("obj/sheep.glb#Scene0");
+        let mut mats = world.resource_mut::<Assets<StandardMaterial>>();
         Self {
-            scene: assets.load("obj/sheep.glb#Scene0"),
+            scene,
+            wool_white: mats.add(StandardMaterial {
+                base_color: Color::srgb(1.0, 1.0, 1.0),
+                perceptual_roughness: 0.9,
+                ..Default::default()
+            }),
+            wool_blue: mats.add(StandardMaterial {
+                base_color: Color::srgb(0.3, 0.5, 1.0),
+                perceptual_roughness: 0.9,
+                ..Default::default()
+            }),
+            wool_red: mats.add(StandardMaterial {
+                base_color: Color::srgb(1.0, 0.3, 0.3),
+                perceptual_roughness: 0.9,
+                ..Default::default()
+            }),
         }
     }
 }
 
-pub fn sheep(sheep_assets: &SheepAssets, position: Vec3, state: &GameState) -> impl Bundle {
-    let mut move_speed_mult = 1.0;
+pub fn sheep(
+    sheep_assets: &SheepAssets,
+    position: Vec3,
+    state: &GameState,
+    color: SheepColor,
+) -> impl Bundle {
+    let mut move_speed_mult = 2.0;
     let mut hop_speed_mult = 1.0;
     let mut time_between_hops = 0.2;
     let mut hop_time_length = 0.3;
@@ -165,7 +201,7 @@ pub fn sheep(sheep_assets: &SheepAssets, position: Vec3, state: &GameState) -> i
             jump_height_mult,
             ..Default::default()
         },
-        Sheep::new()
+        Sheep::new(color)
             .default_speed_mult(move_speed_mult)
             .spooked_speed_mult(move_speed_mult * 2.0)
             .step_distance(move_speed_mult * 2.0),
@@ -291,7 +327,17 @@ fn sheep_goal_check(
             SheepState::BeingAbducted => {}
             SheepState::BeingCounted => {
                 if pos.distance_squared(goal_pos) < 1.5 {
-                    state.points += 1;
+                    match sheep.color {
+                        SheepColor::White => {
+                            state.points += 1;
+                        }
+                        SheepColor::Blue => {
+                            state.points += 5;
+                        }
+                        SheepColor::Red => {
+                            state.points = floor(state.points as f32 * 1.5) as u32;
+                        }
+                    }
                     commands.entity(entity).despawn();
                 }
             }
@@ -324,4 +370,42 @@ fn pick_evasion_dir(pos: Vec2, preferred: Vec2, bounds: &LevelBounds) -> Vec2 {
     }
 
     best_dir
+}
+
+fn apply_wool_material_on_scene_ready(
+    scene_ready: On<SceneInstanceReady>,
+    mut commands: Commands,
+    sheep_q: Query<&Sheep>,
+    children: Query<&Children>,
+    mesh_materials: Query<(&MeshMaterial3d<StandardMaterial>, &GltfMaterialName)>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let Ok(sheep) = sheep_q.get(scene_ready.entity) else {
+        return;
+    };
+
+    let tint = match sheep.color {
+        SheepColor::White => Color::srgb(1.0, 1.0, 1.0),
+        SheepColor::Blue => Color::srgb(0.3, 0.5, 1.0),
+        SheepColor::Red => Color::srgb(1.0, 0.3, 0.3),
+    };
+
+    for descendant in children.iter_descendants(scene_ready.entity) {
+        let Ok((mat_handle, mat_name)) = mesh_materials.get(descendant) else {
+            continue;
+        };
+
+        if mat_name.0 != "wool" {
+            continue;
+        }
+
+        let Some(mut new_mat) = materials.get(mat_handle.id()).cloned() else {
+            continue;
+        };
+        new_mat.base_color = tint;
+
+        commands
+            .entity(descendant)
+            .insert(MeshMaterial3d(materials.add(new_mat)));
+    }
 }

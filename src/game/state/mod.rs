@@ -26,6 +26,8 @@ pub enum GamePhase {
 #[reflect(Resource)]
 pub struct GameState {
     pub sheep_count: u16,
+    pub blue_sheep_count: u16,
+    pub red_sheep_count: u16,
     pub countdown: Timer,
     pub points: u32,
     pub point_target: u32,
@@ -37,6 +39,8 @@ impl Default for GameState {
     fn default() -> Self {
         Self {
             sheep_count: 10,
+            blue_sheep_count: 1,
+            red_sheep_count: 1,
             countdown: Timer::from_seconds(120.0, TimerMode::Once),
             points: 0,
             point_target: 10,

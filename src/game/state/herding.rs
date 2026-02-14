@@ -1,13 +1,15 @@
 use bevy::prelude::*;
+use rand::{Rng, seq::SliceRandom};
 
 use crate::{
     AppSystems, PausableSystems,
     game::{
         camera::CameraTarget,
+        level::LevelBounds,
         modifiers::Modifier,
         movement::{HopMovementController, SpaceMovementController},
         player::{PlayerAssets, player},
-        sheep::{SheepAssets, sheep},
+        sheep::{SheepAssets, SheepColor, sheep},
         state::{GamePhase, GameState},
     },
     screens::Screen,
@@ -49,24 +51,24 @@ pub fn on_herding(
     sheep_assets: Res<SheepAssets>,
     player_assets: Res<PlayerAssets>,
     game_state: Res<GameState>,
+    bounds: Res<LevelBounds>,
     mut camera_target: ResMut<CameraTarget>,
 ) {
-    let count = game_state.sheep_count as usize;
-    if count == 0 {
+    let total_sheep = game_state.sheep_count as usize;
+    if total_sheep == 0 {
         return;
     }
 
-    let grid = (count as f32).sqrt().ceil() as usize;
-    let spacing = 10.0;
-    let offset = (grid as f32 - 1.0) * 0.5;
+    let sheep_colors = build_sheep_colors(&game_state);
+    let rng = &mut rand::rng();
 
     // spawn sheep
-    for i in 0..count {
-        let x = (i % grid) as f32;
-        let z = (i / grid) as f32;
-        let pos = Vec3::new((x - offset) * spacing, 0.0, (z - offset) * spacing);
+    for color in sheep_colors {
+        let x = rng.random_range(bounds.min.x..=bounds.max.x);
+        let z = rng.random_range(bounds.min.y..=bounds.max.y);
+        let pos = Vec3::new(x, 0.0, z);
         commands.spawn((
-            sheep(&sheep_assets, pos, &game_state),
+            sheep(&sheep_assets, pos, &game_state, color),
             DespawnOnExit(GamePhase::Herding),
         ));
     }
@@ -87,6 +89,28 @@ pub fn on_herding(
     camera_target.0 = Some(player);
 
     draw_herding_ui(&mut commands);
+}
+
+fn build_sheep_colors(game_state: &GameState) -> Vec<SheepColor> {
+    let total_sheep = game_state.sheep_count as usize;
+    let mut colors = Vec::with_capacity(total_sheep);
+
+    let colored_counts = [
+        (SheepColor::Blue, game_state.blue_sheep_count as usize),
+        (SheepColor::Red, game_state.red_sheep_count as usize),
+    ];
+
+    for (color, count) in colored_counts {
+        colors.extend(std::iter::repeat_n(color, count));
+    }
+
+    if colors.len() > total_sheep {
+        colors.truncate(total_sheep);
+    }
+
+    let white_count = total_sheep.saturating_sub(colors.len());
+    colors.extend(std::iter::repeat_n(SheepColor::White, white_count));
+    colors
 }
 
 fn check_points_goal(game_state: Res<GameState>, mut next_state: ResMut<NextState<GamePhase>>) {
