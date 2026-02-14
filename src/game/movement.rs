@@ -154,6 +154,7 @@ pub struct SpaceMovementController {
     /// Current planar velocity.
     pub velocity: Vec2,
     pub max_speed: f32,
+    pub propulsion_mult: f32,
 }
 
 impl SpaceMovementController {
@@ -169,7 +170,8 @@ impl Default for SpaceMovementController {
     fn default() -> Self {
         Self {
             velocity: Vec2::ZERO,
-            max_speed: 12.0,
+            max_speed: 10.0,
+            propulsion_mult: 2.0,
         }
     }
 }
@@ -186,7 +188,7 @@ impl SpaceMovementController {
         movement: &mut MovementController,
         _current_pos: Vec2,
     ) {
-        self.velocity += movement.intent * delta_secs;
+        self.velocity += movement.intent * delta_secs * self.propulsion_mult;
         movement.intent = Vec2::ZERO;
         if self.max_speed > 0.0 {
             self.velocity = self.velocity.clamp_length_max(self.max_speed);

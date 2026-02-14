@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::game::state::{
-    GamePhase,
+    GamePhase, GameState,
     shop::{items::ItemType, ui::redraw_shop_ui},
 };
 
@@ -14,8 +14,8 @@ pub struct ShopOffers {
 }
 
 impl ShopOffers {
-    pub fn reroll(&mut self) {
-        self.items = ItemType::random_unique(ItemType::SHOP_OFFER_COUNT)
+    pub fn reroll(&mut self, owned_charms: &[items::Charm]) {
+        self.items = ItemType::random_unique(ItemType::SHOP_OFFER_COUNT, owned_charms)
             .into_iter()
             .map(Some)
             .collect();
@@ -28,6 +28,6 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(Update, redraw_shop_ui.run_if(in_state(GamePhase::Shop)));
 }
 
-fn on_shop(mut shop_offers: ResMut<ShopOffers>) {
-    shop_offers.reroll();
+fn on_shop(mut shop_offers: ResMut<ShopOffers>, game_state: Res<GameState>) {
+    shop_offers.reroll(&game_state.charms);
 }

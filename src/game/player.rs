@@ -32,10 +32,10 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 /// The player character.
-pub fn player(player_assets: &PlayerAssets) -> impl Bundle {
+pub fn player(player_assets: &PlayerAssets, bark_radius: f32) -> impl Bundle {
     (
         Name::new("Player"),
-        Player::default(),
+        Player::new(bark_radius),
         SceneRoot(player_assets.scene.clone()),
         Transform::from_xyz(0.0, 0.0, 0.0),
         MovementController::new(3.0),
@@ -47,12 +47,14 @@ pub fn player(player_assets: &PlayerAssets) -> impl Bundle {
 #[reflect(Component)]
 pub struct Player {
     pub bark_radius: f32,
+    pub sheep_interact_radius: f32,
     pub bark_cooldown: Timer,
 }
-impl Default for Player {
-    fn default() -> Self {
+impl Player {
+    pub fn new(bark_radius: f32) -> Self {
         Self {
-            bark_radius: 8.0,
+            bark_radius,
+            sheep_interact_radius: 8.0,
             bark_cooldown: Timer::from_seconds(2.0, TimerMode::Once),
         }
     }

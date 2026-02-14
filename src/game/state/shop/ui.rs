@@ -1,4 +1,5 @@
 use bevy::{math::ops::floor, prelude::*};
+use rand::Rng;
 
 use crate::{
     game::{
@@ -11,7 +12,7 @@ use crate::{
             },
         },
     },
-    theme::prelude::*,
+    theme::{palette::LABEL_TEXT, prelude::*},
 };
 
 #[derive(Component)]
@@ -66,8 +67,10 @@ pub fn draw_shop_ui(mut commands: Commands, game_state: &GameState, shop_offers:
                             flex_direction: FlexDirection::Column,
                             align_items: AlignItems::Center,
                             row_gap: px(12),
+                            border: UiRect::horizontal(px(1)),
                             ..default()
                         },
+                        BorderColor::all(LABEL_TEXT.with_alpha(0.35)),
                         children![
                             widget::header("Shop"),
                             (
@@ -107,14 +110,14 @@ pub fn draw_shop_ui(mut commands: Commands, game_state: &GameState, shop_offers:
                                 })),
                             ),
                             widget::divider(),
+                            widget::label("Sheep Count"),
                             (
                                 widget::row(),
                                 children![
-                                    widget::label(format!(
-                                        "Total Sheep: {}",
-                                        game_state.sheep_count
-                                    )),
-                                    widget::button_medium("Buy a Sheep (1)", buy_sheep)
+                                    widget::label(format!("Total: {}", game_state.sheep_count)),
+                                    widget::label(format!("Blue: {}", game_state.blue_sheep_count)),
+                                    widget::label(format!("Red: {}", game_state.red_sheep_count)),
+                                    widget::button_medium("Buy Sheep (1)", buy_sheep)
                                 ]
                             ),
                             widget::divider(),
@@ -246,7 +249,7 @@ fn draw_new_items(
         return;
     }
     game_state.money -= 1;
-    shop_offers.reroll();
+    shop_offers.reroll(&game_state.charms);
 }
 
 fn item_card(slot: usize, item: ItemType, money: u32, charms_full: bool) -> impl Bundle {
@@ -334,6 +337,17 @@ fn buy_sheep(_: On<Pointer<Click>>, mut game_state: ResMut<GameState>) {
         return;
     }
     game_state.sheep_count += 1;
+    let mut rng = rand::rng();
+    if game_state.is_charm_active(Charm::ChanceBlueOnBuy) {
+        if rng.random_ratio(1, 10) {
+            game_state.blue_sheep_count += 1;
+        }
+    }
+    if game_state.is_charm_active(Charm::ChanceRedOnBuy) {
+        if rng.random_ratio(1, 10) {
+            game_state.red_sheep_count += 1;
+        }
+    }
     game_state.money -= 1;
 }
 

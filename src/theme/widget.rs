@@ -72,6 +72,7 @@ pub fn columns() -> impl Bundle {
         Name::new("Columns"),
         Node {
             flex_direction: FlexDirection::Row,
+            column_gap: px(10),
             width: percent(100),
             height: percent(100),
             ..default()

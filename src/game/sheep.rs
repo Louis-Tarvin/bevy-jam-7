@@ -13,13 +13,12 @@ use crate::{
         modifiers::Modifier,
         movement::{HopMovementController, MovementController},
         player::Player,
-        state::GameState,
+        state::{GamePhase, GameState, shop::items::Charm},
         ufo::UFO_HEIGHT,
     },
     screens::Screen,
 };
 
-const SHEEP_INTERACT_RANGE: f32 = 5.0;
 const ABDUCTION_ASCENT_SPEED: f32 = 6.0;
 
 pub(super) fn plugin(app: &mut App) {
@@ -55,8 +54,10 @@ pub enum SheepState {
 pub enum SheepColor {
     #[default]
     White,
+    Black,
     Blue,
     Red,
+    Gold,
 }
 
 #[derive(Component, Debug, Clone, PartialEq, Reflect)]
@@ -76,11 +77,11 @@ impl Sheep {
         let mut sheep = Self {
             state: SheepState::Wander(Timer::from_seconds(1.0, TimerMode::Once)),
             color,
-            step_distance: 2.0,
+            step_distance: 1.5,
             min_wait: 1.5,
             max_wait: 5.0,
             default_speed_mult: 1.0,
-            spooked_speed_mult: 2.0,
+            spooked_speed_mult: 1.7,
         };
         sheep.reset_timer();
         sheep
@@ -124,7 +125,7 @@ impl Sheep {
     }
 
     pub fn start_abduction(&mut self) -> bool {
-        if self.is_being_abducted() {
+        if self.is_being_abducted() || matches!(self.state, SheepState::BeingCounted) {
             return false;
         }
         self.state = SheepState::BeingAbducted;
@@ -138,8 +139,10 @@ pub struct SheepAssets {
     #[dependency]
     pub scene: Handle<Scene>,
     pub wool_white: Handle<StandardMaterial>,
+    pub wool_black: Handle<StandardMaterial>,
     pub wool_blue: Handle<StandardMaterial>,
     pub wool_red: Handle<StandardMaterial>,
+    pub wool_gold: Handle<StandardMaterial>,
 }
 
 impl FromWorld for SheepAssets {
@@ -154,6 +157,11 @@ impl FromWorld for SheepAssets {
                 perceptual_roughness: 0.9,
                 ..Default::default()
             }),
+            wool_black: mats.add(StandardMaterial {
+                base_color: Color::srgb(0.12, 0.12, 0.12),
+                perceptual_roughness: 0.9,
+                ..Default::default()
+            }),
             wool_blue: mats.add(StandardMaterial {
                 base_color: Color::srgb(0.3, 0.5, 1.0),
                 perceptual_roughness: 0.9,
@@ -162,6 +170,12 @@ impl FromWorld for SheepAssets {
             wool_red: mats.add(StandardMaterial {
                 base_color: Color::srgb(1.0, 0.3, 0.3),
                 perceptual_roughness: 0.9,
+                ..Default::default()
+            }),
+            wool_gold: mats.add(StandardMaterial {
+                base_color: Color::srgb(1.0, 0.82, 0.2),
+                perceptual_roughness: 0.5,
+                metallic: 0.6,
                 ..Default::default()
             }),
         }
@@ -174,20 +188,26 @@ pub fn sheep(
     state: &GameState,
     color: SheepColor,
 ) -> impl Bundle {
+    let color = if matches!(color, SheepColor::White) && rand::rng().random_bool(0.05) {
+        SheepColor::Black
+    } else {
+        color
+    };
+
     let mut move_speed_mult = 2.0;
-    let mut hop_speed_mult = 1.0;
+    let mut hop_speed_mult = 2.5;
     let mut time_between_hops = 0.2;
     let mut hop_time_length = 0.3;
     let mut jump_height_mult = 1.0;
 
     if state.is_modifier_active(Modifier::MoonGravity) {
-        hop_speed_mult *= 0.8;
+        hop_speed_mult *= 0.5;
         // move_speed_mult *= 0.8;
         hop_time_length += 0.5;
         jump_height_mult *= 6.0;
     }
     if state.is_modifier_active(Modifier::HyperSheep) {
-        hop_speed_mult *= 1.3;
+        hop_speed_mult *= 2.0;
         move_speed_mult *= 1.3;
         time_between_hops *= 0.1;
     }
@@ -204,7 +224,7 @@ pub fn sheep(
         Sheep::new(color)
             .default_speed_mult(move_speed_mult)
             .spooked_speed_mult(move_speed_mult * 2.0)
-            .step_distance(move_speed_mult * 2.0),
+            .step_distance(move_speed_mult),
         SceneRoot(sheep_assets.scene.clone()),
         Transform::from_translation(position),
         DespawnOnExit(Screen::Gameplay),
@@ -238,47 +258,63 @@ fn sheep_state_update(
         &Transform,
         &mut Sheep,
     )>,
-    player_query: Query<&Transform, With<Player>>,
+    player_query: Query<(&Transform, &Player)>,
     goal_query: Query<&Transform, (With<GoalLocation>, Without<Player>)>,
     bounds: Res<LevelBounds>,
+    game_state: Res<GameState>,
 ) {
     for (mut movement, mut controller, transform, mut sheep) in &mut sheep_query {
         let pos = transform.translation.xz();
         match sheep.state {
             SheepState::Wander(_) => {
                 movement.move_speed_mult = sheep.default_speed_mult;
-                for player_transform in player_query {
+                for (player_transform, player) in player_query {
                     let player_pos = player_transform.translation.xz();
-                    if pos.distance(player_pos) < SHEEP_INTERACT_RANGE {
+                    if pos.distance(player_pos) < player.sheep_interact_radius {
                         sheep.state = SheepState::Evading(player_pos);
                     }
                 }
             }
             SheepState::Evading(mut danger_pos) => {
-                for player_transform in player_query {
+                for (player_transform, player) in player_query {
                     let player_pos = player_transform.translation.xz();
-                    if pos.distance(player_pos) < SHEEP_INTERACT_RANGE {
+                    if pos.distance(player_pos) < player.sheep_interact_radius {
                         danger_pos = player_pos;
                     }
-                }
-                if pos.distance(danger_pos) >= SHEEP_INTERACT_RANGE {
-                    sheep.state = SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
-                    sheep.reset_timer();
-                } else {
-                    let preferred = (pos - danger_pos).normalize_or(Vec2::X);
-                    let dir = pick_evasion_dir(pos, preferred, &bounds);
-                    movement.move_speed_mult = sheep.default_speed_mult;
-                    movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                    if pos.distance(danger_pos) >= player.sheep_interact_radius {
+                        sheep.state = SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
+                        sheep.reset_timer();
+                    } else {
+                        let preferred = (pos - danger_pos).normalize_or(Vec2::X);
+                        let dir = pick_evasion_dir(pos, preferred, &bounds);
+                        movement.move_speed_mult = sheep.default_speed_mult;
+                        movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                    }
                 }
             }
             SheepState::Spooked(danger_pos) => {
-                if pos.distance(danger_pos) >= SHEEP_INTERACT_RANGE * 2.0 {
-                    sheep.state = SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
-                    sheep.reset_timer();
-                } else {
-                    let dir = (pos - danger_pos).normalize_or(Vec2::X);
-                    movement.move_speed_mult = sheep.spooked_speed_mult;
-                    movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                for (_, player) in player_query {
+                    if game_state.is_charm_active(Charm::WellTrained) {
+                        if pos.distance(danger_pos) < player.sheep_interact_radius {
+                            sheep.state =
+                                SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
+                            sheep.reset_timer();
+                        } else {
+                            let dir = (danger_pos - pos).normalize_or(Vec2::X);
+                            movement.move_speed_mult = sheep.default_speed_mult;
+                            movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                        }
+                    } else {
+                        if pos.distance(danger_pos) >= player.sheep_interact_radius + 8.0 {
+                            sheep.state =
+                                SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
+                            sheep.reset_timer();
+                        } else {
+                            let dir = (pos - danger_pos).normalize_or(Vec2::X);
+                            movement.move_speed_mult = sheep.spooked_speed_mult;
+                            movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
+                        }
+                    }
                 }
             }
             SheepState::BeingCounted => {
@@ -319,15 +355,17 @@ fn sheep_goal_check(
     sheep_query: Query<(Entity, &Transform, &mut Sheep)>,
     goal_query: Single<&Transform, With<GoalLocation>>,
     mut state: ResMut<GameState>,
+    sheep_assets: Res<SheepAssets>,
+    bounds: Res<LevelBounds>,
 ) {
     let goal_pos = goal_query.translation.xz();
-    for (entity, sheep_transform, mut sheep) in sheep_query {
+    for (entity, sheep_transform, mut sheep_c) in sheep_query {
         let pos = sheep_transform.translation.xz();
-        match sheep.state {
+        match sheep_c.state {
             SheepState::BeingAbducted => {}
             SheepState::BeingCounted => {
                 if pos.distance_squared(goal_pos) < 1.5 {
-                    match sheep.color {
+                    match sheep_c.color {
                         SheepColor::White => {
                             state.points += 1;
                         }
@@ -337,13 +375,36 @@ fn sheep_goal_check(
                         SheepColor::Red => {
                             state.points = floor(state.points as f32 * 1.5) as u32;
                         }
+                        SheepColor::Black => {
+                            state.points += 1;
+                            if state.is_charm_active(Charm::Exponential) {
+                                let rng = &mut rand::rng();
+                                let x = rng.random_range(bounds.min.x..=bounds.max.x);
+                                let z = rng.random_range(bounds.min.y..=bounds.max.y);
+                                let pos = Vec3::new(x, 0.0, z);
+                                commands.spawn((
+                                    sheep(&sheep_assets, pos, &state, SheepColor::Black),
+                                    DespawnOnExit(GamePhase::Herding),
+                                ));
+                                let x = rng.random_range(bounds.min.x..=bounds.max.x);
+                                let z = rng.random_range(bounds.min.y..=bounds.max.y);
+                                let pos = Vec3::new(x, 0.0, z);
+                                commands.spawn((
+                                    sheep(&sheep_assets, pos, &state, SheepColor::Black),
+                                    DespawnOnExit(GamePhase::Herding),
+                                ));
+                            }
+                        }
+                        SheepColor::Gold => {
+                            state.money += 1;
+                        }
                     }
                     commands.entity(entity).despawn();
                 }
             }
             _ => {
                 if pos.distance_squared(goal_pos) < GOAL_RADIUS * GOAL_RADIUS {
-                    sheep.state = SheepState::BeingCounted;
+                    sheep_c.state = SheepState::BeingCounted;
                 }
             }
         }
@@ -386,8 +447,10 @@ fn apply_wool_material_on_scene_ready(
 
     let tint = match sheep.color {
         SheepColor::White => Color::srgb(1.0, 1.0, 1.0),
+        SheepColor::Black => Color::srgb(0.12, 0.12, 0.12),
         SheepColor::Blue => Color::srgb(0.3, 0.5, 1.0),
         SheepColor::Red => Color::srgb(1.0, 0.3, 0.3),
+        SheepColor::Gold => Color::srgb(1.0, 0.82, 0.2),
     };
 
     for descendant in children.iter_descendants(scene_ready.entity) {

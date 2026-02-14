@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{math::ops::floor, prelude::*};
 use rand::Rng;
 
@@ -8,7 +10,9 @@ use crate::{
 
 mod herding;
 mod modifier_choice;
-mod shop;
+pub mod shop;
+
+const TIMER_SECONDS: f32 = 60.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_sub_state::<GamePhase>();
@@ -38,6 +42,7 @@ pub struct GameState {
     pub money: u32,
     pub charms: Vec<Charm>,
     pub max_charms: u8,
+    pub player_bark_radius: f32,
 }
 
 impl Default for GameState {
@@ -46,19 +51,27 @@ impl Default for GameState {
             sheep_count: 10,
             blue_sheep_count: 1,
             red_sheep_count: 1,
-            countdown: Timer::from_seconds(120.0, TimerMode::Once),
+            countdown: Timer::from_seconds(TIMER_SECONDS, TimerMode::Once),
             points: 0,
             point_target: 4,
             active_modifiers: Vec::new(),
             money: 0,
-            charms: Vec::with_capacity(3),
-            max_charms: 3,
+            charms: Vec::with_capacity(4),
+            max_charms: 4,
+            player_bark_radius: 12.0,
         }
     }
 }
 
 impl GameState {
     pub fn new_round(&mut self) -> NewRoundInfo {
+        if self.is_charm_active(Charm::HalfTimeDoubleSheep) {
+            self.countdown
+                .set_duration(Duration::from_secs_f32(TIMER_SECONDS / 2.0));
+        } else {
+            self.countdown
+                .set_duration(Duration::from_secs_f32(TIMER_SECONDS));
+        }
         self.countdown.reset();
         self.points = 0;
         self.point_target = floor(self.point_target as f32 * 1.5) as u32;

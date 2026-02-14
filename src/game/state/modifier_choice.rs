@@ -47,7 +47,7 @@ fn draw_choice_ui(
                         Name::new("Modifiers Row"),
                         Node {
                             width: percent(100),
-                            justify_content: JustifyContent::SpaceBetween,
+                            justify_content: JustifyContent::SpaceAround,
                             align_items: AlignItems::FlexStart,
                             flex_direction: FlexDirection::Row,
                             flex_wrap: FlexWrap::Wrap,

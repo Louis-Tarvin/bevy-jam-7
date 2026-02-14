@@ -10,7 +10,7 @@ use crate::{
         movement::{HopMovementController, SpaceMovementController},
         player::{PlayerAssets, player},
         sheep::{SheepAssets, SheepColor, sheep},
-        state::{GamePhase, GameState},
+        state::{GamePhase, GameState, shop::items::Charm},
     },
     screens::Screen,
     theme::prelude::*,
@@ -59,8 +59,12 @@ pub fn on_herding(
         return;
     }
 
-    let sheep_colors = build_sheep_colors(&game_state);
+    let mut sheep_colors = build_sheep_colors(&game_state);
     let rng = &mut rand::rng();
+
+    if game_state.is_charm_active(Charm::GoldenSheep) {
+        sheep_colors.push(SheepColor::Gold);
+    }
 
     // spawn sheep
     for color in sheep_colors {
@@ -75,16 +79,19 @@ pub fn on_herding(
 
     // spawn player
     let player = commands
-        .spawn((player(&player_assets), DespawnOnExit(GamePhase::Herding)))
+        .spawn((
+            player(&player_assets, game_state.player_bark_radius),
+            DespawnOnExit(GamePhase::Herding),
+        ))
         .id();
     if game_state.is_modifier_active(Modifier::Space) {
         commands
             .entity(player)
-            .insert(SpaceMovementController::new(20.0));
+            .insert(SpaceMovementController::new(10.0));
     } else {
         commands
             .entity(player)
-            .insert(HopMovementController::new(1.0, 0.1, 0.2));
+            .insert(HopMovementController::new(1.2, 0.1, 0.2));
     }
     camera_target.0 = Some(player);
 
@@ -92,7 +99,11 @@ pub fn on_herding(
 }
 
 fn build_sheep_colors(game_state: &GameState) -> Vec<SheepColor> {
-    let total_sheep = game_state.sheep_count as usize;
+    let total_sheep = if game_state.is_charm_active(Charm::HalfTimeDoubleSheep) {
+        game_state.sheep_count as usize * 2
+    } else {
+        game_state.sheep_count as usize
+    };
     let mut colors = Vec::with_capacity(total_sheep);
 
     let colored_counts = [
@@ -100,7 +111,10 @@ fn build_sheep_colors(game_state: &GameState) -> Vec<SheepColor> {
         (SheepColor::Red, game_state.red_sheep_count as usize),
     ];
 
-    for (color, count) in colored_counts {
+    for (color, mut count) in colored_counts {
+        if game_state.is_charm_active(Charm::HalfTimeDoubleSheep) {
+            count *= 2;
+        }
         colors.extend(std::iter::repeat_n(color, count));
     }
 

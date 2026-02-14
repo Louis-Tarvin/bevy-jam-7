@@ -37,8 +37,6 @@ pub struct LevelAssets {
     // music: Handle<AudioSource>,
     #[dependency]
     arena: Handle<Scene>,
-    #[dependency]
-    ufo: Handle<Scene>,
 }
 
 impl FromWorld for LevelAssets {
@@ -47,7 +45,6 @@ impl FromWorld for LevelAssets {
         Self {
             // music: assets.load("audio/music/Fluffing A Duck.ogg"),
             arena: assets.load("obj/arena.glb#Scene0"),
-            ufo: assets.load("obj/ufo.glb#Scene0"),
         }
     }
 }
