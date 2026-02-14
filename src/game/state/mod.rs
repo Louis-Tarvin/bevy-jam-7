@@ -12,11 +12,12 @@ mod herding;
 mod modifier_choice;
 pub mod shop;
 
-const TIMER_SECONDS: f32 = 60.0;
+const TIMER_SECONDS: f32 = 90.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_sub_state::<GamePhase>();
     app.insert_resource(GameState::default());
+    app.insert_resource(RoundStats::default());
     app.add_plugins((herding::plugin, modifier_choice::plugin, shop::plugin));
 }
 
@@ -35,6 +36,8 @@ pub struct GameState {
     pub sheep_count: u16,
     pub blue_sheep_count: u16,
     pub red_sheep_count: u16,
+    pub black_sheep_count: u16,
+    pub gold_sheep_count: u16,
     pub countdown: Timer,
     pub points: u32,
     pub point_target: u32,
@@ -53,12 +56,14 @@ impl Default for GameState {
             red_sheep_count: 1,
             countdown: Timer::from_seconds(TIMER_SECONDS, TimerMode::Once),
             points: 0,
-            point_target: 4,
+            point_target: 3,
             active_modifiers: Vec::new(),
             money: 0,
             charms: Vec::with_capacity(4),
             max_charms: 4,
             player_bark_radius: 12.0,
+            black_sheep_count: 0,
+            gold_sheep_count: 0,
         }
     }
 }
@@ -74,7 +79,8 @@ impl GameState {
         }
         self.countdown.reset();
         self.points = 0;
-        self.point_target = floor(self.point_target as f32 * 1.5) as u32;
+        // self.point_target = floor(self.point_target as f32 * 1.5) as u32;
+        self.point_target += 2;
         let removed_modifier = if self.active_modifiers.len() > 2 {
             Some(self.active_modifiers.remove(0))
         } else {
@@ -119,4 +125,12 @@ impl GameState {
 pub struct NewRoundInfo {
     removed_modifier: Option<Modifier>,
     modifier_choices: Vec<Modifier>,
+}
+
+#[derive(Debug, Default, Resource, Reflect)]
+#[reflect(Resource)]
+pub struct RoundStats {
+    pub sheep_counted: u16,
+    pub white_sheep_counted: u16,
+    pub black_sheep_counted: u16,
 }

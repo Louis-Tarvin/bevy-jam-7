@@ -2,15 +2,31 @@
 
 use bevy::prelude::*;
 
-use crate::{asset_tracking::LoadResource, screens::Screen};
+use crate::{
+    AppSystems, PausableSystems, asset_tracking::LoadResource, game::camera::MainCamera,
+    screens::Screen,
+};
 
 pub const GOAL_RADIUS: f32 = 6.0;
+const GOAL_TEXT_LIFETIME_SECS: f32 = 2.5;
+const GOAL_TEXT_RISE_SPEED: f32 = 0.8;
+const GOAL_TEXT_FONT_SIZE: f32 = 32.0;
+const GOAL_TEXT_HEIGHT_OFFSET: f32 = 1.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.load_resource::<LevelAssets>();
+    app.add_message::<GoalTextMessage>();
+    app.add_systems(
+        Update,
+        (spawn_goal_text, tick_goal_text)
+            .chain()
+            .in_set(AppSystems::Update)
+            .in_set(PausableSystems)
+            .run_if(in_state(Screen::Gameplay)),
+    );
     app.insert_resource(LevelBounds {
-        min: (-34.5, -49.5).into(),
-        max: (34.5, 9.5).into(),
+        min: (-27.6, -39.6).into(),
+        max: (27.6, 7.6).into(),
     });
 }
 
@@ -52,27 +68,97 @@ impl FromWorld for LevelAssets {
 #[derive(Component)]
 pub struct GoalLocation;
 
+#[derive(Message, Debug, Clone)]
+pub struct GoalTextMessage {
+    pub text: String,
+    pub color: Option<Color>,
+}
+
+#[derive(Component, Debug)]
+struct GoalFloatingText {
+    world_pos: Vec3,
+    lifetime: Timer,
+}
+
+fn spawn_goal_text(
+    mut commands: Commands,
+    mut events: MessageReader<GoalTextMessage>,
+    goal_query: Query<&GlobalTransform, With<GoalLocation>>,
+) {
+    let Some(goal_transform) = goal_query.iter().next() else {
+        return;
+    };
+
+    for event in events.read() {
+        commands.spawn((
+            Name::new("Goal Floating Text"),
+            Node {
+                position_type: PositionType::Absolute,
+                ..default()
+            },
+            Text::new(event.text.clone()),
+            TextFont::from_font_size(GOAL_TEXT_FONT_SIZE),
+            TextColor(event.color.unwrap_or(Color::WHITE)),
+            Pickable::IGNORE,
+            GoalFloatingText {
+                world_pos: goal_transform.translation() + Vec3::Y * GOAL_TEXT_HEIGHT_OFFSET,
+                lifetime: Timer::from_seconds(GOAL_TEXT_LIFETIME_SECS, TimerMode::Once),
+            },
+            DespawnOnExit(Screen::Gameplay),
+        ));
+    }
+}
+
+fn tick_goal_text(
+    mut commands: Commands,
+    time: Res<Time>,
+    camera: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
+    mut query: Query<(Entity, &mut Node, &mut GoalFloatingText)>,
+) {
+    let (camera, camera_transform) = *camera;
+
+    for (entity, mut node, mut floating_text) in &mut query {
+        floating_text.lifetime.tick(time.delta());
+        floating_text.world_pos.y += GOAL_TEXT_RISE_SPEED * time.delta_secs();
+
+        match camera.world_to_viewport(camera_transform, floating_text.world_pos) {
+            Ok(viewport_pos) => {
+                node.left = px(viewport_pos.x);
+                node.top = px(viewport_pos.y);
+                node.display = Display::DEFAULT;
+            }
+            Err(_) => {
+                node.display = Display::None;
+            }
+        }
+
+        if floating_text.lifetime.is_finished() {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
 /// A system that spawns the main level.
 pub fn spawn_level(
     mut commands: Commands,
-    mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
+    // mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
     level_assets: Res<LevelAssets>,
 ) {
-    let mut gizmo = GizmoAsset::new();
+    // let mut gizmo = GizmoAsset::new();
 
-    gizmo
-        .sphere(
-            Isometry3d::IDENTITY,
-            GOAL_RADIUS,
-            bevy::color::palettes::css::CRIMSON,
-        )
-        .resolution(30_000 / 6);
+    // gizmo
+    //     .sphere(
+    //         Isometry3d::IDENTITY,
+    //         GOAL_RADIUS,
+    //         bevy::color::palettes::css::CRIMSON,
+    //     )
+    //     .resolution(30_000 / 6);
 
     commands.spawn((
         Name::new("Level"),
-        Transform::default(),
         Visibility::default(),
         DespawnOnExit(Screen::Gameplay),
+        Transform::default(),
         children![
             // (
             //     Name::new("Gameplay Music"),
@@ -91,15 +177,15 @@ pub fn spawn_level(
             (
                 Name::new("Goal"),
                 GoalLocation,
-                Transform::from_xyz(0.0, 0.0, 10.0),
-                Gizmo {
-                    handle: gizmo_assets.add(gizmo),
-                    line_config: GizmoLineConfig {
-                        width: 0.5,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
+                Transform::from_xyz(0.0, 0.0, 8.0),
+                // Gizmo {
+                //     handle: gizmo_assets.add(gizmo),
+                //     line_config: GizmoLineConfig {
+                //         width: 0.5,
+                //         ..Default::default()
+                //     },
+                //     ..Default::default()
+                // }
             )
         ],
     ));

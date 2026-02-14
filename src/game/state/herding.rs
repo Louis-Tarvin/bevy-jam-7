@@ -10,7 +10,7 @@ use crate::{
         movement::{HopMovementController, SpaceMovementController},
         player::{PlayerAssets, player},
         sheep::{SheepAssets, SheepColor, sheep},
-        state::{GamePhase, GameState, shop::items::Charm},
+        state::{GamePhase, GameState, RoundStats, shop::items::Charm},
     },
     screens::Screen,
     theme::prelude::*,
@@ -51,9 +51,12 @@ pub fn on_herding(
     sheep_assets: Res<SheepAssets>,
     player_assets: Res<PlayerAssets>,
     game_state: Res<GameState>,
+    mut round_stats: ResMut<RoundStats>,
     bounds: Res<LevelBounds>,
     mut camera_target: ResMut<CameraTarget>,
 ) {
+    *round_stats = RoundStats::default();
+
     let total_sheep = game_state.sheep_count as usize;
     if total_sheep == 0 {
         return;
@@ -109,6 +112,8 @@ fn build_sheep_colors(game_state: &GameState) -> Vec<SheepColor> {
     let colored_counts = [
         (SheepColor::Blue, game_state.blue_sheep_count as usize),
         (SheepColor::Red, game_state.red_sheep_count as usize),
+        (SheepColor::Black, game_state.black_sheep_count as usize),
+        (SheepColor::Gold, game_state.gold_sheep_count as usize),
     ];
 
     for (color, mut count) in colored_counts {

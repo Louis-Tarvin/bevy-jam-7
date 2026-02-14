@@ -9,11 +9,11 @@ use crate::{
     AppSystems, PausableSystems,
     asset_tracking::LoadResource,
     game::{
-        level::{GOAL_RADIUS, GoalLocation, LevelBounds},
+        level::{GOAL_RADIUS, GoalLocation, GoalTextMessage, LevelBounds},
         modifiers::Modifier,
         movement::{HopMovementController, MovementController},
         player::Player,
-        state::{GamePhase, GameState, shop::items::Charm},
+        state::{GamePhase, GameState, RoundStats, shop::items::Charm},
         ufo::UFO_HEIGHT,
     },
     screens::Screen,
@@ -27,7 +27,7 @@ const HERD_SEPARATION_RADIUS_SQ: f32 = HERD_SEPARATION_RADIUS * HERD_SEPARATION_
 const HERD_CELL_SIZE: f32 = HERD_RADIUS;
 const HERD_COHESION_WEIGHT: f32 = 0.9;
 const HERD_SEPARATION_WEIGHT: f32 = 1.5;
-const HERD_EVADE_BLEND: f32 = 0.75;
+const HERD_EVADE_BLEND: f32 = 0.55;
 const HERD_WANDER_JITTER: f32 = 0.35;
 const HERD_UPDATE_INTERVAL_SECS: f32 = 0.10;
 const HERD_UPDATE_BUCKETS: u64 = 4;
@@ -93,8 +93,8 @@ impl Sheep {
             step_distance: 1.5,
             min_wait: 1.5,
             max_wait: 7.0,
-            default_speed_mult: 1.0,
-            spooked_speed_mult: 1.7,
+            default_speed_mult: 1.2,
+            spooked_speed_mult: 1.9,
             herd_dir: Vec2::ZERO,
         };
         sheep.reset_timer();
@@ -202,7 +202,12 @@ pub fn sheep(
     state: &GameState,
     color: SheepColor,
 ) -> impl Bundle {
-    let color = if matches!(color, SheepColor::White) && rand::rng().random_bool(0.05) {
+    let p = if state.is_charm_active(Charm::Ink) {
+        0.1
+    } else {
+        0.05
+    };
+    let color = if matches!(color, SheepColor::White) && rand::rng().random_bool(p) {
         SheepColor::Black
     } else {
         color
@@ -480,8 +485,10 @@ fn sheep_goal_check(
     sheep_query: Query<(Entity, &Transform, &mut Sheep)>,
     goal_query: Single<&Transform, With<GoalLocation>>,
     mut state: ResMut<GameState>,
+    mut round_stats: ResMut<RoundStats>,
     sheep_assets: Res<SheepAssets>,
     bounds: Res<LevelBounds>,
+    mut writer: MessageWriter<GoalTextMessage>,
 ) {
     let goal_pos = goal_query.translation.xz();
     for (entity, sheep_transform, mut sheep_c) in sheep_query {
@@ -490,18 +497,71 @@ fn sheep_goal_check(
             SheepState::BeingAbducted => {}
             SheepState::BeingCounted => {
                 if pos.distance_squared(goal_pos) < 1.5 {
+                    let is_first_counted = round_stats.sheep_counted == 0;
+                    if is_first_counted && state.is_charm_active(Charm::Cloning) {
+                        state.sheep_count += 1;
+                        match sheep_c.color {
+                            SheepColor::Blue => state.blue_sheep_count += 1,
+                            SheepColor::Red => state.red_sheep_count += 1,
+                            SheepColor::Black => state.black_sheep_count += 1,
+                            SheepColor::Gold => state.gold_sheep_count += 1,
+                            _ => {}
+                        }
+                        writer.write(GoalTextMessage {
+                            text: "Cloned".to_string(),
+                            color: Some(Color::srgb(0.55, 0.85, 0.95)),
+                        });
+                    }
+
                     match sheep_c.color {
                         SheepColor::White => {
-                            state.points += 1;
+                            if state.is_charm_active(Charm::Evolution) {
+                                round_stats.white_sheep_counted += 1;
+                                if round_stats.white_sheep_counted % 5 == 0 {
+                                    state.blue_sheep_count += 1;
+                                    writer.write(GoalTextMessage {
+                                        text: "Evolved to blue".to_string(),
+                                        color: Some(Color::srgb(0.3, 0.4, 0.8)),
+                                    });
+                                } else {
+                                    writer.write(GoalTextMessage {
+                                        text: "0 points".to_string(),
+                                        color: None,
+                                    });
+                                }
+                            } else {
+                                state.points += 1;
+                                writer.write(GoalTextMessage {
+                                    text: "+1 point".to_string(),
+                                    color: None,
+                                });
+                            }
                         }
                         SheepColor::Blue => {
                             state.points += 5;
+                            writer.write(GoalTextMessage {
+                                text: "+5 points".to_string(),
+                                color: Some(Color::srgb(0.3, 0.4, 0.8)),
+                            });
                         }
                         SheepColor::Red => {
+                            if is_first_counted && state.is_charm_active(Charm::RedToGold) {
+                                state.red_sheep_count -= 1;
+                                state.gold_sheep_count += 1;
+                            }
                             state.points = floor(state.points as f32 * 1.5) as u32;
+                            writer.write(GoalTextMessage {
+                                text: "points x1.5".to_string(),
+                                color: Some(Color::srgb(1.0, 0.3, 0.3)),
+                            });
                         }
                         SheepColor::Black => {
+                            round_stats.black_sheep_counted += 1;
                             state.points += 1;
+                            writer.write(GoalTextMessage {
+                                text: "+1 point".to_string(),
+                                color: None,
+                            });
                             if state.is_charm_active(Charm::Exponential) {
                                 let rng = &mut rand::rng();
                                 let x = rng.random_range(bounds.min.x..=bounds.max.x);
@@ -522,8 +582,13 @@ fn sheep_goal_check(
                         }
                         SheepColor::Gold => {
                             state.money += 1;
+                            writer.write(GoalTextMessage {
+                                text: "+1 gold".to_string(),
+                                color: Some(Color::srgb(1.0, 0.82, 0.2)),
+                            });
                         }
                     }
+                    round_stats.sheep_counted += 1;
                     commands.entity(entity).despawn();
                 }
             }
@@ -571,22 +636,22 @@ fn apply_wool_material_on_scene_ready(
     sheep_q: Query<&Sheep>,
     children: Query<&Children>,
     mesh_materials: Query<(&MeshMaterial3d<StandardMaterial>, &GltfMaterialName)>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    sheep_assets: Res<SheepAssets>,
 ) {
     let Ok(sheep) = sheep_q.get(scene_ready.entity) else {
         return;
     };
 
-    let tint = match sheep.color {
-        SheepColor::White => Color::srgb(1.0, 1.0, 1.0),
-        SheepColor::Black => Color::srgb(0.12, 0.12, 0.12),
-        SheepColor::Blue => Color::srgb(0.3, 0.5, 1.0),
-        SheepColor::Red => Color::srgb(1.0, 0.3, 0.3),
-        SheepColor::Gold => Color::srgb(1.0, 0.82, 0.2),
+    let material = match sheep.color {
+        SheepColor::White => sheep_assets.wool_white.clone(),
+        SheepColor::Black => sheep_assets.wool_black.clone(),
+        SheepColor::Blue => sheep_assets.wool_blue.clone(),
+        SheepColor::Red => sheep_assets.wool_red.clone(),
+        SheepColor::Gold => sheep_assets.wool_gold.clone(),
     };
 
     for descendant in children.iter_descendants(scene_ready.entity) {
-        let Ok((mat_handle, mat_name)) = mesh_materials.get(descendant) else {
+        let Ok((_mat_handle, mat_name)) = mesh_materials.get(descendant) else {
             continue;
         };
 
@@ -594,13 +659,8 @@ fn apply_wool_material_on_scene_ready(
             continue;
         }
 
-        let Some(mut new_mat) = materials.get(mat_handle.id()).cloned() else {
-            continue;
-        };
-        new_mat.base_color = tint;
-
         commands
             .entity(descendant)
-            .insert(MeshMaterial3d(materials.add(new_mat)));
+            .insert(MeshMaterial3d(material.clone()));
     }
 }

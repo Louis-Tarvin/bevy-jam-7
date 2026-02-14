@@ -10,8 +10,6 @@ pub enum ItemType {
 }
 
 impl ItemType {
-    pub const SHOP_OFFER_COUNT: usize = 3;
-
     pub fn name(&self) -> &'static str {
         match self {
             ItemType::Boost(boost) => boost.name(),
@@ -40,38 +38,45 @@ impl ItemType {
         }
     }
 
-    pub fn random<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        let pool = [
-            ItemType::Boost(Boost::BlueSheep),
-            ItemType::Boost(Boost::RedSheep),
-            ItemType::Boost(Boost::BarkPower),
-            ItemType::Boost(Boost::MaxCharms),
-            ItemType::Charm(Charm::GoldenSheep),
-            ItemType::Charm(Charm::HalfTimeDoubleSheep),
-            ItemType::Charm(Charm::ChanceBlueOnBuy),
-            ItemType::Charm(Charm::ChanceRedOnBuy),
-            ItemType::Charm(Charm::Exponential),
-            ItemType::Charm(Charm::WellTrained),
-        ];
-        let idx = rng.random_range(0..pool.len());
-        pool[idx]
-    }
-
     pub fn random_unique(count: usize, owned_charms: &[Charm]) -> Vec<Self> {
         let mut rng = rand::rng();
         let mut items = Vec::with_capacity(count);
-        let mut attempts = 0;
-        while items.len() < count && attempts < 100 {
-            let next = Self::random(&mut rng);
-            if matches!(next, ItemType::Charm(charm) if owned_charms.contains(&charm))
-                || items.contains(&next)
-            {
-                attempts += 1;
-                continue;
+
+        let boosts = [
+            Boost::BlueSheep,
+            Boost::RedSheep,
+            Boost::BarkPower,
+            Boost::MaxCharms,
+        ];
+        let boost_idx = rng.random_range(0..boosts.len());
+        items.push(ItemType::Boost(boosts[boost_idx]));
+
+        let charm_pool = [
+            Charm::GoldenSheep,
+            Charm::HalfTimeDoubleSheep,
+            Charm::ChanceBlueOnBuy,
+            Charm::ChanceRedOnBuy,
+            Charm::Exponential,
+            Charm::WellTrained,
+            Charm::Evolution,
+            Charm::Cloning,
+            Charm::ShopCount,
+            Charm::Ink,
+            Charm::RedToGold,
+        ];
+        let available_charms: Vec<Charm> = charm_pool
+            .into_iter()
+            .filter(|charm| !owned_charms.contains(charm))
+            .collect();
+
+        while items.len() < count && items.len() - 1 < available_charms.len() {
+            let charm_idx = rng.random_range(0..available_charms.len());
+            let next = ItemType::Charm(available_charms[charm_idx]);
+            if !items.contains(&next) {
+                items.push(next);
             }
-            items.push(next);
-            attempts += 1;
         }
+
         items
     }
 }
@@ -107,7 +112,7 @@ impl Boost {
         match self {
             Boost::BlueSheep => 2,
             Boost::RedSheep => 2,
-            Boost::BarkPower => 3,
+            Boost::BarkPower => 2,
             Boost::MaxCharms => 3,
         }
     }
@@ -116,7 +121,7 @@ impl Boost {
         match self {
             Boost::BlueSheep => state.blue_sheep_count += 1,
             Boost::RedSheep => state.red_sheep_count += 1,
-            Boost::BarkPower => state.player_bark_radius += 2.0,
+            Boost::BarkPower => state.player_bark_radius += 1.0,
             Boost::MaxCharms => {
                 let rng = &mut rand::rng();
                 if rng.random_ratio(1, 4) {
@@ -135,6 +140,12 @@ pub enum Charm {
     ChanceRedOnBuy,
     Exponential,
     WellTrained,
+    DoubleCountRadius,
+    Evolution,
+    Cloning,
+    ShopCount,
+    Ink,
+    RedToGold,
 }
 
 impl Charm {
@@ -146,6 +157,12 @@ impl Charm {
             Charm::ChanceRedOnBuy => "Red Chance",
             Charm::Exponential => "Mitosis",
             Charm::WellTrained => "Well Trained",
+            Charm::DoubleCountRadius => "Eager",
+            Charm::Evolution => "Evolution",
+            Charm::Cloning => "Cloning",
+            Charm::ShopCount => "Fully Stocked",
+            Charm::Ink => "Ink",
+            Charm::RedToGold => "Rose Gold",
         }
     }
 
@@ -153,12 +170,24 @@ impl Charm {
         match self {
             Charm::GoldenSheep => "Spawn a golden sheep that gives 1 money when counted.",
             Charm::HalfTimeDoubleSheep => "Halve the timer but spawn double the sheep.",
-            Charm::ChanceBlueOnBuy => "Each time you buy a sheep it has a 10% chance to be blue.",
-            Charm::ChanceRedOnBuy => "Each time you buy a sheep it has a 10% chance to be red.",
+            Charm::ChanceBlueOnBuy => {
+                "Each time you buy a sheep it has a 1 in 4 chance to be blue."
+            }
+            Charm::ChanceRedOnBuy => "Each time you buy a sheep it has a 1 in 4 chance to be red.",
             Charm::Exponential => {
                 "When a black sheep is counted, spawn two new black sheep at random locations."
             }
             Charm::WellTrained => "Sheep come towards you when you bark.",
+            Charm::DoubleCountRadius => "Double the radius",
+            Charm::Evolution => {
+                "White sheep score 0, but every 5th white sheep counted becomes permanently blue."
+            }
+            Charm::Cloning => {
+                "For the first sheep counted each round, a clone will be permanently added to your flock."
+            }
+            Charm::ShopCount => "The shop sells an additional item.",
+            Charm::Ink => "Double the probability that a white sheep will spawn as black.",
+            Charm::RedToGold => "If the first sheep to be counted is red, it turns gold.",
         }
     }
 
@@ -170,6 +199,12 @@ impl Charm {
             Charm::ChanceRedOnBuy => 3,
             Charm::Exponential => 5,
             Charm::WellTrained => 4,
+            Charm::DoubleCountRadius => 3,
+            Charm::Evolution => 5,
+            Charm::Cloning => 4,
+            Charm::ShopCount => 3,
+            Charm::Ink => 3,
+            Charm::RedToGold => 4,
         }
     }
 }

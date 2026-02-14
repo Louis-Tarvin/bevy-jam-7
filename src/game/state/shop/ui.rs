@@ -249,7 +249,12 @@ fn draw_new_items(
         return;
     }
     game_state.money -= 1;
-    shop_offers.reroll(&game_state.charms);
+    let count = if game_state.is_charm_active(Charm::ShopCount) {
+        4
+    } else {
+        3
+    };
+    shop_offers.reroll(&game_state.charms, count);
 }
 
 fn item_card(slot: usize, item: ItemType, money: u32, charms_full: bool) -> impl Bundle {
@@ -339,12 +344,12 @@ fn buy_sheep(_: On<Pointer<Click>>, mut game_state: ResMut<GameState>) {
     game_state.sheep_count += 1;
     let mut rng = rand::rng();
     if game_state.is_charm_active(Charm::ChanceBlueOnBuy) {
-        if rng.random_ratio(1, 10) {
+        if rng.random_ratio(1, 4) {
             game_state.blue_sheep_count += 1;
         }
     }
     if game_state.is_charm_active(Charm::ChanceRedOnBuy) {
-        if rng.random_ratio(1, 10) {
+        if rng.random_ratio(1, 4) {
             game_state.red_sheep_count += 1;
         }
     }
@@ -379,7 +384,7 @@ fn sell_charm(slot: usize, game_state: &mut GameState) {
     };
 
     game_state.charms.remove(slot);
-    game_state.money += charm.price();
+    game_state.money += floor(charm.price() as f32 / 2.0) as u32;
 }
 
 pub fn redraw_shop_ui(
