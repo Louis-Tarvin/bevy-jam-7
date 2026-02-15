@@ -12,6 +12,7 @@ use crate::{
         sheep::{SheepAssets, SheepColor, sheep},
         state::{GamePhase, GameState, RoundStats, shop::items::Charm},
     },
+    post_processing::DreamCloudVignette,
     screens::Screen,
     theme::prelude::*,
 };
@@ -54,6 +55,7 @@ pub fn on_herding(
     mut round_stats: ResMut<RoundStats>,
     bounds: Res<LevelBounds>,
     mut camera_target: ResMut<CameraTarget>,
+    mut vignette: ResMut<DreamCloudVignette>,
 ) {
     *round_stats = RoundStats::default();
 
@@ -99,6 +101,12 @@ pub fn on_herding(
     camera_target.0 = Some(player);
 
     draw_herding_ui(&mut commands);
+
+    if game_state.is_modifier_active(Modifier::Vignette) {
+        vignette.target_coverage = 0.4;
+    } else {
+        vignette.target_coverage = 0.2;
+    }
 }
 
 fn build_sheep_colors(game_state: &GameState) -> Vec<SheepColor> {

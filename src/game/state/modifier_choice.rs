@@ -5,6 +5,7 @@ use crate::{
         modifiers::Modifier,
         state::{GamePhase, GameState, NewRoundInfo},
     },
+    post_processing::DreamCloudVignette,
     theme::prelude::*,
 };
 
@@ -12,13 +13,19 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(GamePhase::ModifierChoice), on_modifier_choice);
 }
 
-fn on_modifier_choice(mut commands: Commands, mut game_state: ResMut<GameState>) {
+fn on_modifier_choice(
+    mut commands: Commands,
+    mut vignette: ResMut<DreamCloudVignette>,
+    mut game_state: ResMut<GameState>,
+) {
     let NewRoundInfo {
         removed_modifier,
         modifier_choices,
     } = game_state.new_round();
 
     draw_choice_ui(&mut commands, removed_modifier, &modifier_choices);
+
+    vignette.target_coverage = 1.0;
 }
 
 fn draw_choice_ui(

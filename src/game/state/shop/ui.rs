@@ -46,7 +46,7 @@ pub fn draw_shop_ui(mut commands: Commands, game_state: &GameState, shop_offers:
                             ..default()
                         },
                         children![
-                            widget::header("Modifiers"),
+                            widget::column_header("Modifiers"),
                             (
                                 Node {
                                     flex_direction: FlexDirection::Column,
@@ -135,7 +135,11 @@ pub fn draw_shop_ui(mut commands: Commands, game_state: &GameState, shop_offers:
                             ..default()
                         },
                         children![
-                            widget::label(format!("Charms ({}/{})", charms.len(), max_charms)),
+                            widget::column_header(format!(
+                                "Charms ({}/{})",
+                                charms.len(),
+                                max_charms
+                            )),
                             (
                                 Node {
                                     flex_direction: FlexDirection::Column,

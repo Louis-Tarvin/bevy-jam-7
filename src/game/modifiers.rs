@@ -11,6 +11,7 @@ pub enum Modifier {
     Ufo,
     Space,
     TeleportingBark,
+    Vignette,
 }
 
 impl Modifier {
@@ -21,6 +22,7 @@ impl Modifier {
             Modifier::Ufo => "UFO",
             Modifier::Space => "Space",
             Modifier::TeleportingBark => "Teleporting Bark",
+            Modifier::Vignette => "Brain Fog",
         }
     }
 
@@ -33,6 +35,9 @@ impl Modifier {
             Modifier::TeleportingBark => {
                 "Every time you bark you'll be teleported to a random location."
             }
+            Modifier::Vignette => {
+                "The clouds around the edges of the screen grow bigger, restricting your visibility"
+            }
         }
     }
 
@@ -44,18 +49,22 @@ impl Modifier {
             Modifier::Ufo => Hard,
             Modifier::Space => Hard,
             Modifier::TeleportingBark => Hard,
+            Modifier::Vignette => Hard,
         }
     }
 }
 
 impl Distribution<Modifier> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Modifier {
-        match rng.random_range(0..4) {
-            0 => Modifier::HyperSheep,
-            1 => Modifier::MoonGravity,
-            2 => Modifier::Ufo,
-            _ => Modifier::Space,
-        }
+        let pool = vec![
+            Modifier::HyperSheep,
+            Modifier::MoonGravity,
+            Modifier::Ufo,
+            Modifier::Space,
+            Modifier::TeleportingBark,
+            Modifier::Vignette,
+        ];
+        pool[rng.random_range(0..pool.len())]
     }
 }
 

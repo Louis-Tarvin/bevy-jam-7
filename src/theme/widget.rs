@@ -38,6 +38,15 @@ pub fn header(text: impl Into<String>) -> impl Bundle {
     )
 }
 
+pub fn column_header(text: impl Into<String>) -> impl Bundle {
+    (
+        Name::new("Header"),
+        Text(text.into()),
+        TextFont::from_font_size(30.0),
+        TextColor(HEADER_TEXT),
+    )
+}
+
 /// A simple text label.
 pub fn label(text: impl Into<String>) -> impl Bundle {
     (
