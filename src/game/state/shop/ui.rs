@@ -12,7 +12,10 @@ use crate::{
             },
         },
     },
-    theme::{palette::LABEL_TEXT, prelude::*},
+    theme::{
+        palette::{BOOST_TEXT, CARD_BACKGROUND, CARD_BORDER, CHARM_TEXT, LABEL_TEXT},
+        prelude::*,
+    },
 };
 
 #[derive(Component)]
@@ -173,27 +176,29 @@ fn charm_card(slot: usize, charm: Charm) -> impl Bundle {
         Node {
             width: px(250),
             max_width: percent(100),
-            padding: UiRect::all(px(12)),
+            padding: UiRect::all(px(8)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::SpaceEvenly,
             flex_direction: FlexDirection::Column,
-            row_gap: px(6),
+            row_gap: px(3),
             border_radius: BorderRadius::all(px(12)),
+            border: UiRect::all(px(1)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.16, 0.2, 0.18, 0.95)),
+        BackgroundColor(CARD_BACKGROUND),
+        BorderColor::all(CARD_BORDER),
         children![
             (
                 Name::new("Charm Name"),
                 Text(charm.name().to_string()),
-                TextFont::from_font_size(22.0),
+                TextFont::from_font_size(20.0),
                 TextColor(ui_palette::HEADER_TEXT),
                 TextLayout::new_with_justify(Justify::Center),
             ),
             (
                 Name::new("Charm Description"),
                 Text(charm.description().to_string()),
-                TextFont::from_font_size(16.0),
+                TextFont::from_font_size(14.0),
                 TextColor(ui_palette::LABEL_TEXT),
                 TextLayout::new_with_justify(Justify::Center),
             ),
@@ -218,9 +223,11 @@ fn modifier_card(modifier: Modifier) -> impl Bundle {
             flex_direction: FlexDirection::Column,
             row_gap: px(6),
             border_radius: BorderRadius::all(px(12)),
+            border: UiRect::all(px(1)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.18, 0.18, 0.22, 0.95)),
+        BackgroundColor(CARD_BACKGROUND),
+        BorderColor::all(CARD_BORDER),
         children![
             (
                 Name::new("Modifier Name"),
@@ -264,6 +271,10 @@ fn draw_new_items(
 fn item_card(slot: usize, item: ItemType, money: u32, charms_full: bool) -> impl Bundle {
     let price = item.price();
     let buy_text = format!("Buy ({})", price);
+    let color = match item {
+        ItemType::Boost(_) => BOOST_TEXT,
+        ItemType::Charm(_) => CHARM_TEXT,
+    };
 
     (
         Name::new(format!("Shop Item Card {}", item.name())),
@@ -276,15 +287,17 @@ fn item_card(slot: usize, item: ItemType, money: u32, charms_full: bool) -> impl
             flex_direction: FlexDirection::Column,
             row_gap: px(6),
             border_radius: BorderRadius::all(px(12)),
+            border: UiRect::all(px(1)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.18, 0.18, 0.22, 0.95)),
+        BackgroundColor(CARD_BACKGROUND),
+        BorderColor::all(CARD_BORDER),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent.spawn((
                 Name::new("Item Type"),
                 Text(item.kind_label().to_string()),
                 TextFont::from_font_size(14.0),
-                TextColor(ui_palette::LABEL_TEXT),
+                TextColor(color),
             ));
             parent.spawn((
                 Name::new("Item Name"),
@@ -323,6 +336,7 @@ fn bought_item_card() -> impl Bundle {
         Node {
             width: px(250),
             max_width: percent(100),
+            height: percent(30),
             padding: UiRect::all(px(12)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
@@ -330,9 +344,8 @@ fn bought_item_card() -> impl Bundle {
             border_radius: BorderRadius::all(px(12)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.12, 0.12, 0.12, 0.95)),
+        BackgroundColor(CARD_BACKGROUND),
         children![(
-            Name::new("Bought Label"),
             Text("Bought".to_string()),
             TextFont::from_font_size(28.0),
             TextColor(ui_palette::LABEL_TEXT.with_alpha(0.75)),

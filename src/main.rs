@@ -19,7 +19,7 @@ use bevy::{
     prelude::*,
 };
 
-use crate::game::camera::MainCamera;
+use crate::{game::camera::MainCamera, theme::palette::BACKGROUND};
 
 fn main() -> AppExit {
     App::new().add_plugins(AppPlugin).run()
@@ -77,6 +77,7 @@ impl Plugin for AppPlugin {
         // Set up the `Pause` state.
         app.init_state::<Pause>();
         app.insert_resource(DefaultSpatialScale(SpatialScale(Vec3::splat(0.15))));
+        app.insert_resource(ClearColor(BACKGROUND));
         app.configure_sets(Update, PausableSystems.run_if(in_state(Pause(false))));
 
         // Spawn the main camera.

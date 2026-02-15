@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::{math::ops::floor, prelude::*};
+use bevy::prelude::*;
 use rand::Rng;
 
 use crate::{

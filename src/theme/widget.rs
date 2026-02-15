@@ -64,7 +64,7 @@ pub fn panel() -> impl Bundle {
             width: percent(95),
             min_width: px(1080),
             max_width: px(1500),
-            padding: UiRect::all(px(28)),
+            padding: UiRect::axes(px(14), px(28)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             flex_direction: FlexDirection::Column,
@@ -72,7 +72,8 @@ pub fn panel() -> impl Bundle {
             border_radius: BorderRadius::all(px(18)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.08, 0.08, 0.1, 0.95)),
+        // BackgroundColor(Color::srgba(0.08, 0.08, 0.1, 0.95)),
+        BackgroundColor(BACKGROUND),
     )
 }
 
@@ -134,7 +135,7 @@ where
             height: px(80),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
-            border_radius: BorderRadius::MAX,
+            border_radius: BorderRadius::all(px(12)),
             ..default()
         },
     )
@@ -151,11 +152,11 @@ where
         20.0,
         action,
         Node {
-            width: px(150),
-            height: px(40),
+            width: px(170),
+            height: px(38),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
-            border_radius: BorderRadius::MAX,
+            border_radius: BorderRadius::all(px(12)),
             ..default()
         },
     )
@@ -170,7 +171,7 @@ pub fn button_medium_disabled(text: impl Into<String>) -> impl Bundle {
             height: px(40),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
-            border_radius: BorderRadius::MAX,
+            border_radius: BorderRadius::all(px(12)),
             ..default()
         },
     )

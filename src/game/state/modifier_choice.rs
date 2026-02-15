@@ -6,7 +6,10 @@ use crate::{
         state::{GamePhase, GameState, NewRoundInfo},
     },
     post_processing::DreamCloudVignette,
-    theme::prelude::*,
+    theme::{
+        palette::{CARD_BACKGROUND, CARD_BORDER},
+        prelude::*,
+    },
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -36,7 +39,6 @@ fn draw_choice_ui(
     commands
         .spawn((
             widget::ui_root("Modifier choice UI"),
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.75)),
             GlobalZIndex(2),
             DespawnOnExit(GamePhase::ModifierChoice),
         ))
@@ -85,9 +87,11 @@ fn modifier_card(modifier: Modifier) -> impl Bundle {
             flex_direction: FlexDirection::Column,
             row_gap: px(6),
             border_radius: BorderRadius::all(px(12)),
+            border: UiRect::all(px(1)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.18, 0.18, 0.22, 0.95)),
+        BackgroundColor(CARD_BACKGROUND),
+        BorderColor::all(CARD_BORDER),
         children![
             (
                 Name::new("Modifier Name"),

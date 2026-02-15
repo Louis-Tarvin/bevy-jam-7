@@ -24,11 +24,14 @@ fn spawn_settings_menu(mut commands: Commands) {
         widget::ui_root("Settings Menu"),
         GlobalZIndex(2),
         DespawnOnExit(Menu::Settings),
-        children![
-            widget::header("Settings"),
-            settings_grid(),
-            widget::button("Back", go_back_on_click),
-        ],
+        children![(
+            widget::panel(),
+            children![
+                widget::header("Settings"),
+                settings_grid(),
+                widget::button("Back", go_back_on_click),
+            ]
+        )],
     ));
 }
 
