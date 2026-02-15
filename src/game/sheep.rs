@@ -9,9 +9,9 @@ use crate::{
     AppSystems, PausableSystems,
     asset_tracking::LoadResource,
     game::{
-        level::{GOAL_RADIUS, GoalLocation, GoalTextMessage, LevelBounds},
+        level::{GOAL_POSITION, GOAL_RADIUS, GoalLocation, GoalTextMessage, LevelBounds},
         modifiers::Modifier,
-        movement::{HopMovementController, MovementController},
+        movement::{HopMovementController, MovementController, SphereMovementController},
         player::Player,
         state::{GamePhase, GameState, RoundStats, shop::items::Charm},
         ufo::UFO_HEIGHT,
@@ -60,6 +60,8 @@ pub enum SheepState {
     BeingCounted,
     /// Targeted by UFO - rise into the sky.
     BeingAbducted,
+    /// Doing nothing
+    Sleeping,
 }
 
 #[derive(Debug, Default, Reflect, Clone, PartialEq)]
@@ -114,6 +116,10 @@ impl Sheep {
     fn step_distance(mut self, dist: f32) -> Self {
         self.step_distance = dist;
         self
+    }
+
+    fn sleeping(&mut self) {
+        self.state = SheepState::Sleeping;
     }
 
     fn reset_timer(&mut self) {
@@ -197,17 +203,20 @@ impl FromWorld for SheepAssets {
 }
 
 pub fn sheep(
+    commands: &mut Commands,
     sheep_assets: &SheepAssets,
-    position: Vec3,
+    mut position: Vec3,
     state: &GameState,
     color: SheepColor,
-) -> impl Bundle {
+    sleeping: bool,
+) -> Entity {
+    let rng = &mut rand::rng();
     let p = if state.is_charm_active(Charm::Ink) {
         0.1
     } else {
         0.05
     };
-    let color = if matches!(color, SheepColor::White) && rand::rng().random_bool(p) {
+    let color = if matches!(color, SheepColor::White) && rng.random_bool(p) {
         SheepColor::Black
     } else {
         color
@@ -224,30 +233,69 @@ pub fn sheep(
         // move_speed_mult *= 0.8;
         hop_time_length += 0.5;
         jump_height_mult *= 6.0;
+        if state.is_modifier_active(Modifier::FeverDream) {
+            jump_height_mult *= 1.5;
+            hop_time_length += 0.5;
+        }
     }
     if state.is_modifier_active(Modifier::HyperSheep) {
         hop_speed_mult *= 2.0;
         move_speed_mult *= 1.3;
         time_between_hops *= 0.1;
+        if state.is_modifier_active(Modifier::FeverDream) {
+            hop_speed_mult *= 1.5;
+        }
     }
-    (
-        Name::new("Sheep"),
-        MovementController::new(move_speed_mult),
-        HopMovementController {
+
+    let mut sheep_c = Sheep::new(color)
+        .default_speed_mult(move_speed_mult)
+        .spooked_speed_mult(move_speed_mult * 2.0)
+        .step_distance(move_speed_mult);
+    if sleeping {
+        sheep_c.sleeping();
+        position.y -= 0.5;
+    }
+
+    let goal_pos = GOAL_POSITION.xz();
+    let to_sheep = position.xz() - goal_pos;
+    if to_sheep.length_squared() < GOAL_RADIUS * GOAL_RADIUS {
+        let dir = if to_sheep.length_squared() <= f32::EPSILON {
+            Vec2::from_angle(rng.random_range(0.0..std::f32::consts::TAU))
+        } else {
+            to_sheep.normalize()
+        };
+        let safe_pos = goal_pos + dir * GOAL_RADIUS;
+        position.x = safe_pos.x;
+        position.z = safe_pos.y;
+    }
+
+    let yaw = rng.random_range(0.0..std::f32::consts::TAU);
+    let entity = commands
+        .spawn((
+            Name::new("Sheep"),
+            MovementController::new(move_speed_mult),
+            sheep_c,
+            SceneRoot(sheep_assets.scene.clone()),
+            Transform::from_translation(position).with_rotation(Quat::from_rotation_y(yaw)),
+            DespawnOnExit(Screen::Gameplay),
+        ))
+        .id();
+
+    if state.is_modifier_active(Modifier::SheepSphere) {
+        commands
+            .entity(entity)
+            .insert(SphereMovementController::new(move_speed_mult, 1.0, 1.0));
+    } else {
+        commands.entity(entity).insert(HopMovementController {
             hop_speed_mult,
             time_between_hops,
             hop_time_length,
             jump_height_mult,
             ..Default::default()
-        },
-        Sheep::new(color)
-            .default_speed_mult(move_speed_mult)
-            .spooked_speed_mult(move_speed_mult * 2.0)
-            .step_distance(move_speed_mult),
-        SceneRoot(sheep_assets.scene.clone()),
-        Transform::from_translation(position),
-        DespawnOnExit(Screen::Gameplay),
-    )
+        });
+    }
+
+    entity
 }
 
 fn sheep_wander(
@@ -279,18 +327,13 @@ fn sheep_wander(
 
 fn sheep_state_update(
     time: Res<Time>,
-    mut sheep_query: Query<(
-        &mut MovementController,
-        &mut HopMovementController,
-        &Transform,
-        &mut Sheep,
-    )>,
+    mut sheep_query: Query<(&mut MovementController, &Transform, &mut Sheep)>,
     player_query: Query<(&Transform, &Player)>,
     goal_query: Query<&Transform, (With<GoalLocation>, Without<Player>)>,
     bounds: Res<LevelBounds>,
     game_state: Res<GameState>,
 ) {
-    for (mut movement, mut controller, transform, mut sheep) in &mut sheep_query {
+    for (mut movement, transform, mut sheep) in &mut sheep_query {
         let pos = transform.translation.xz();
         match sheep.state {
             SheepState::Wander(_) => {
@@ -350,13 +393,20 @@ fn sheep_state_update(
                 sheep.herd_dir = Vec2::ZERO;
                 let goal_pos = goal_query.single().unwrap().translation.xz();
                 let dir = (goal_pos - pos).normalize_or(Vec2::X);
-                controller.hop_speed_mult = 0.8;
-                movement.move_speed_mult = 0.8;
+                // movement.move_speed_mult = 0.8;
                 movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
             }
             SheepState::BeingAbducted => {
                 sheep.herd_dir = Vec2::ZERO;
                 movement.intent = transform.translation.xz();
+            }
+            SheepState::Sleeping => {
+                for (player_transform, player) in player_query {
+                    let player_pos = player_transform.translation.xz();
+                    if pos.distance(player_pos) < player.sheep_interact_radius {
+                        sheep.state = SheepState::Evading(player_pos);
+                    }
+                }
             }
         }
     }
@@ -496,7 +546,7 @@ fn sheep_goal_check(
         match sheep_c.state {
             SheepState::BeingAbducted => {}
             SheepState::BeingCounted => {
-                if pos.distance_squared(goal_pos) < 1.5 {
+                if pos.distance_squared(goal_pos) < 2.5 {
                     let is_first_counted = round_stats.sheep_counted == 0;
                     if is_first_counted && state.is_charm_active(Charm::Cloning) {
                         state.sheep_count += 1;
@@ -567,17 +617,31 @@ fn sheep_goal_check(
                                 let x = rng.random_range(bounds.min.x..=bounds.max.x);
                                 let z = rng.random_range(bounds.min.y..=bounds.max.y);
                                 let pos = Vec3::new(x, 0.0, z);
-                                commands.spawn((
-                                    sheep(&sheep_assets, pos, &state, SheepColor::Black),
-                                    DespawnOnExit(GamePhase::Herding),
-                                ));
+                                let entity = sheep(
+                                    &mut commands,
+                                    &sheep_assets,
+                                    pos,
+                                    &state,
+                                    SheepColor::Black,
+                                    false,
+                                );
+                                commands
+                                    .entity(entity)
+                                    .insert(DespawnOnExit(GamePhase::Herding));
                                 let x = rng.random_range(bounds.min.x..=bounds.max.x);
                                 let z = rng.random_range(bounds.min.y..=bounds.max.y);
                                 let pos = Vec3::new(x, 0.0, z);
-                                commands.spawn((
-                                    sheep(&sheep_assets, pos, &state, SheepColor::Black),
-                                    DespawnOnExit(GamePhase::Herding),
-                                ));
+                                let entity = sheep(
+                                    &mut commands,
+                                    &sheep_assets,
+                                    pos,
+                                    &state,
+                                    SheepColor::Black,
+                                    false,
+                                );
+                                commands
+                                    .entity(entity)
+                                    .insert(DespawnOnExit(GamePhase::Herding));
                             }
                         }
                         SheepColor::Gold => {

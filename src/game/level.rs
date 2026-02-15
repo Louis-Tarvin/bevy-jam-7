@@ -7,11 +7,17 @@ use crate::{
     AppSystems, PausableSystems,
     asset_tracking::LoadResource,
     audio::{MusicLayer, music},
-    game::camera::MainCamera,
+    game::{
+        camera::MainCamera,
+        modifiers::Modifier,
+        movement::MovementController,
+        state::{GamePhase, GameState},
+    },
     screens::Screen,
 };
 
 pub const GOAL_RADIUS: f32 = 6.0;
+pub const GOAL_POSITION: Vec3 = Vec3::new(0.0, 0.0, 8.2);
 const GOAL_TEXT_LIFETIME_SECS: f32 = 2.5;
 const GOAL_TEXT_RISE_SPEED: f32 = 0.8;
 const GOAL_TEXT_FONT_SIZE: f32 = 32.0;
@@ -83,15 +89,18 @@ pub struct RandomTeleport {
 
 fn handle_random_teleport(
     event: On<RandomTeleport>,
-    mut query: Query<&mut Transform>,
+    mut query: Query<(&mut Transform, Option<&mut MovementController>)>,
     bounds: Res<LevelBounds>,
 ) {
-    if let Ok(mut transform) = query.get_mut(event.entity) {
+    if let Ok((mut transform, controller)) = query.get_mut(event.entity) {
         let rng = &mut rand::rng();
         let x = rng.random_range(bounds.min.x..=bounds.max.x);
         let z = rng.random_range(bounds.min.y..=bounds.max.y);
         let pos = Vec3::new(x, 0.0, z);
         transform.translation = pos;
+        if let Some(mut controller) = controller {
+            controller.intent = pos.xz();
+        }
     }
 }
 
@@ -173,6 +182,8 @@ pub fn spawn_level(
     mut commands: Commands,
     // mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
     level_assets: Res<LevelAssets>,
+    game_state: Res<GameState>,
+    mut ambient_query: Query<&mut AmbientLight, With<MainCamera>>,
 ) {
     // let mut gizmo = GizmoAsset::new();
 
@@ -184,10 +195,33 @@ pub fn spawn_level(
     //     )
     //     .resolution(30_000 / 6);
 
+    let night = game_state.is_modifier_active(Modifier::Night);
+    let (sun_color, sun_transform, ambient_color, ambient_brightness) = if night {
+        (
+            Color::srgb(0.12, 0.15, 0.32),
+            Transform::from_xyz(-1.5, 2.5, -0.5).looking_at(Vec3::ZERO, Vec3::Y),
+            Color::srgb(0.35, 0.45, 0.8),
+            100.0,
+        )
+    } else {
+        (
+            Color::srgb(0.9, 1.0, 0.9),
+            Transform::from_xyz(0.5, 0.5, 2.0).looking_at(Vec3::ZERO, Vec3::Y),
+            Color::srgb(0.5, 0.5, 1.0),
+            150.0,
+        )
+    };
+
+    if let Ok(mut ambient) = ambient_query.single_mut() {
+        ambient.color = ambient_color;
+        ambient.brightness = ambient_brightness;
+    }
+
     commands.spawn((
         Name::new("Level"),
         Visibility::default(),
         DespawnOnExit(Screen::Gameplay),
+        DespawnOnExit(GamePhase::ModifierChoice),
         Transform::default(),
         children![
             // (
@@ -199,15 +233,15 @@ pub fn spawn_level(
                 Name::new("Sun"),
                 DirectionalLight {
                     shadows_enabled: true,
-                    color: Color::srgb(0.9, 1.0, 0.9),
+                    color: sun_color,
                     ..Default::default()
                 },
-                Transform::from_xyz(0.5, 0.5, 2.0).looking_at(Vec3::ZERO, Vec3::Y)
+                sun_transform
             ),
             (
                 Name::new("Goal"),
                 GoalLocation,
-                Transform::from_xyz(0.0, 0.0, 8.0),
+                Transform::from_translation(GOAL_POSITION),
                 // Gizmo {
                 //     handle: gizmo_assets.add(gizmo),
                 //     line_config: GizmoLineConfig {

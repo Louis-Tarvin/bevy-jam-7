@@ -6,9 +6,9 @@ use crate::{
     audio::BgmConfig,
     game::{
         camera::CameraTarget,
-        level::LevelBounds,
+        level::{LevelBounds, spawn_level},
         modifiers::Modifier,
-        movement::{HopMovementController, SpaceMovementController},
+        movement::{HopMovementController, SpaceMovementController, SphereMovementController},
         player::{PlayerAssets, player},
         sheep::{SheepAssets, SheepColor, sheep},
         state::{GamePhase, GameState, RoundStats, shop::items::Charm},
@@ -19,7 +19,7 @@ use crate::{
 };
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(OnEnter(GamePhase::Herding), on_herding);
+    app.add_systems(OnEnter(GamePhase::Herding), (on_herding, spawn_level));
     app.add_systems(
         Update,
         tick_countdown
@@ -76,22 +76,34 @@ pub fn on_herding(
     if game_state.is_charm_active(Charm::GoldenSheep) {
         sheep_colors.push(SheepColor::Gold);
     }
+    let sleeping = game_state.is_modifier_active(Modifier::Night);
 
     // spawn sheep
     for color in sheep_colors {
         let x = rng.random_range(bounds.min.x..=bounds.max.x);
         let z = rng.random_range(bounds.min.y..=bounds.max.y);
         let pos = Vec3::new(x, 0.0, z);
-        commands.spawn((
-            sheep(&sheep_assets, pos, &game_state, color),
-            DespawnOnExit(GamePhase::Herding),
-        ));
+        let entity = sheep(
+            &mut commands,
+            &sheep_assets,
+            pos,
+            &game_state,
+            color,
+            sleeping,
+        );
+        commands
+            .entity(entity)
+            .insert(DespawnOnExit(GamePhase::Herding));
     }
 
     // spawn player
     let player = commands
         .spawn((
-            player(&player_assets, game_state.player_bark_radius),
+            player(
+                &player_assets,
+                game_state.player_bark_radius,
+                game_state.is_modifier_active(Modifier::DogSphere),
+            ),
             DespawnOnExit(GamePhase::Herding),
         ))
         .id();
@@ -99,6 +111,10 @@ pub fn on_herding(
         commands
             .entity(player)
             .insert(SpaceMovementController::new(10.0));
+    } else if game_state.is_modifier_active(Modifier::DogSphere) {
+        commands
+            .entity(player)
+            .insert(SphereMovementController::new(8.0, 0.8, 1.0));
     } else {
         commands
             .entity(player)
@@ -109,7 +125,11 @@ pub fn on_herding(
     draw_herding_ui(&mut commands);
 
     if game_state.is_modifier_active(Modifier::Vignette) {
-        vignette.target_coverage = 0.4;
+        if game_state.is_modifier_active(Modifier::FeverDream) {
+            vignette.target_coverage = 0.5;
+        } else {
+            vignette.target_coverage = 0.4;
+        }
     } else {
         vignette.target_coverage = 0.2;
     }

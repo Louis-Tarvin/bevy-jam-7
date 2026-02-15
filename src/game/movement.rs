@@ -16,7 +16,11 @@ use crate::{
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (apply_hop_movement, apply_space_movement)
+        (
+            apply_hop_movement,
+            apply_sphere_movement,
+            apply_space_movement,
+        )
             .chain()
             .in_set(AppSystems::Update)
             .in_set(PausableSystems),
@@ -145,6 +149,54 @@ impl HopMovementController {
     }
 }
 
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+#[component(on_add)]
+#[require(Transform, MovementController)]
+pub struct SphereMovementController {
+    pub roll_speed_mult: f32,
+    pub roll_radius: f32,
+    /// Local-space distance from model origin (feet) to sphere center.
+    pub center_offset_y: f32,
+}
+
+impl SphereMovementController {
+    pub fn new(roll_speed_mult: f32, roll_radius: f32, center_offset_y: f32) -> Self {
+        Self {
+            roll_speed_mult,
+            roll_radius,
+            center_offset_y,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for SphereMovementController {
+    fn default() -> Self {
+        Self {
+            roll_speed_mult: 1.0,
+            roll_radius: 0.5,
+            center_offset_y: 0.5,
+        }
+    }
+}
+
+impl SphereMovementController {
+    fn on_add(mut world: DeferredWorld, context: HookContext) {
+        let pos = world
+            .get::<Transform>(context.entity)
+            .unwrap()
+            .translation
+            .xz();
+        let mut movement = world.get_mut::<MovementController>(context.entity).unwrap();
+        movement.intent = pos;
+    }
+
+    pub fn center_offset(&self) -> Vec3 {
+        Vec3::Y * self.center_offset_y
+    }
+}
+
 /// Frictionless Newtonian movement on the x,z plane.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
@@ -198,11 +250,14 @@ impl SpaceMovementController {
 
 fn apply_hop_movement(
     time: Res<Time>,
-    mut movement_query: Query<(
-        &mut MovementController,
-        &mut HopMovementController,
-        &mut Transform,
-    )>,
+    mut movement_query: Query<
+        (
+            &mut MovementController,
+            &mut HopMovementController,
+            &mut Transform,
+        ),
+        Without<SphereMovementController>,
+    >,
     player_assets: If<Res<PlayerAssets>>,
     mut commands: Commands,
     bounds: Res<LevelBounds>,
@@ -244,6 +299,50 @@ fn apply_hop_movement(
     }
 }
 
+fn apply_sphere_movement(
+    time: Res<Time>,
+    mut movement_query: Query<
+        (
+            &mut MovementController,
+            &mut SphereMovementController,
+            &mut Transform,
+        ),
+        Without<HopMovementController>,
+    >,
+    bounds: Res<LevelBounds>,
+) {
+    for (mut movement, controller, mut transform) in &mut movement_query {
+        movement.intent = bounds.clamp_to_bounds(movement.intent);
+        let offset = controller.center_offset();
+        let mut center = transform.translation + transform.rotation * offset;
+        let current_pos = center.xz();
+        let to_target = movement.intent - current_pos;
+        let distance_to_target = to_target.length();
+
+        let mut move_delta = Vec2::ZERO;
+        if distance_to_target > f32::EPSILON {
+            let step = (movement.move_speed_mult * controller.roll_speed_mult * time.delta_secs())
+                .min(distance_to_target);
+            let desired_next = current_pos + to_target / distance_to_target * step;
+            let clamped_next = bounds.clamp_to_bounds(desired_next);
+            move_delta = clamped_next - current_pos;
+        }
+
+        let distance = move_delta.length();
+        if distance > f32::EPSILON && controller.roll_radius > f32::EPSILON {
+            let forward = Vec3::new(move_delta.x, 0.0, move_delta.y).normalize();
+            let axis = Vec3::Y.cross(forward).normalize_or(Vec3::X);
+            let angle = distance / controller.roll_radius;
+            transform.rotation = Quat::from_axis_angle(axis, angle) * transform.rotation;
+        }
+
+        center.x += move_delta.x;
+        center.z += move_delta.y;
+        center.y = controller.roll_radius;
+        transform.translation = center - transform.rotation * offset;
+    }
+}
+
 fn apply_space_movement(
     time: Res<Time>,
     mut movement_query: Query<
@@ -252,7 +351,10 @@ fn apply_space_movement(
             &mut SpaceMovementController,
             &mut Transform,
         ),
-        Without<HopMovementController>,
+        (
+            Without<HopMovementController>,
+            Without<SphereMovementController>,
+        ),
     >,
     bounds: Res<LevelBounds>,
 ) {

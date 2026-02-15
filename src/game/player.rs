@@ -36,11 +36,16 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 /// The player character.
-pub fn player(player_assets: &PlayerAssets, bark_radius: f32) -> impl Bundle {
+pub fn player(player_assets: &PlayerAssets, bark_radius: f32, is_sphere: bool) -> impl Bundle {
+    let scene = if is_sphere {
+        player_assets.scene_sphere.clone()
+    } else {
+        player_assets.scene.clone()
+    };
     (
         Name::new("Player"),
         Player::new(bark_radius),
-        SceneRoot(player_assets.scene.clone()),
+        SceneRoot(scene),
         Transform::from_xyz(0.0, 0.0, 0.0),
         MovementController::new(3.0),
         SpatialListener::new(0.2),
@@ -58,7 +63,7 @@ impl Player {
     pub fn new(bark_radius: f32) -> Self {
         Self {
             bark_radius,
-            sheep_interact_radius: 8.0,
+            sheep_interact_radius: 7.0,
             bark_cooldown: Timer::from_seconds(2.0, TimerMode::Once),
         }
     }
@@ -141,7 +146,7 @@ fn init_player_gear_visuals(
     let show_gear = game_state.is_modifier_active(Modifier::Space);
 
     for (entity, name) in &gear_query {
-        let is_gear = matches!(name.as_str(), "Helmet" | "Jetpack");
+        let is_gear = name.contains("Helmet") || name.contains("Jetpack");
         if !is_gear || !is_descendant_of_player(entity, &parent_query, &player_query) {
             continue;
         }
@@ -184,6 +189,8 @@ pub struct PlayerAssets {
     pub bark: Handle<AudioSource>,
     #[dependency]
     pub scene: Handle<Scene>,
+    #[dependency]
+    pub scene_sphere: Handle<Scene>,
 }
 
 impl FromWorld for PlayerAssets {
@@ -198,6 +205,7 @@ impl FromWorld for PlayerAssets {
             ],
             bark: assets.load("audio/sound_effects/bark.ogg"),
             scene: assets.load("obj/dog.glb#Scene0"),
+            scene_sphere: assets.load("obj/dog.glb#Scene1"),
         }
     }
 }

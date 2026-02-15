@@ -29,6 +29,11 @@ pub fn draw_shop_ui(mut commands: Commands, game_state: &GameState, shop_offers:
     let point_target = game_state.point_target;
     let offers = shop_offers.items.clone();
     let charms_full = game_state.charms_full();
+    let gold_sheep_count = if game_state.is_charm_active(Charm::GoldenSheep) {
+        game_state.gold_sheep_count + 1
+    } else {
+        game_state.gold_sheep_count
+    };
     commands.spawn((
         ShopUiRoot,
         widget::ui_root("Shop UI"),
@@ -120,9 +125,10 @@ pub fn draw_shop_ui(mut commands: Commands, game_state: &GameState, shop_offers:
                                     widget::label(format!("Total: {}", game_state.sheep_count)),
                                     widget::label(format!("Blue: {}", game_state.blue_sheep_count)),
                                     widget::label(format!("Red: {}", game_state.red_sheep_count)),
-                                    widget::button_medium("Buy Sheep (1)", buy_sheep)
+                                    widget::label(format!("Gold: {}", gold_sheep_count)),
                                 ]
                             ),
+                            widget::button_medium("Buy Sheep (1)", buy_sheep),
                             widget::divider(),
                             widget::label(format!("Points target: {}", point_target)),
                             widget::button("Start", start_next_round)
@@ -134,6 +140,7 @@ pub fn draw_shop_ui(mut commands: Commands, game_state: &GameState, shop_offers:
                             min_width: px(250),
                             flex_grow: 1.0,
                             flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
                             row_gap: px(12),
                             ..default()
                         },

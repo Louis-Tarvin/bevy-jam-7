@@ -79,8 +79,13 @@ impl GameState {
         }
         self.countdown.reset();
         self.points = 0;
-        // self.point_target = floor(self.point_target as f32 * 1.5) as u32;
-        self.point_target += 2;
+        if self.point_target >= 50 {
+            self.point_target += 4;
+        } else if self.point_target >= 30 {
+            self.point_target += 3;
+        } else {
+            self.point_target += 2;
+        }
         let removed_modifier = if self.active_modifiers.len() > 2 {
             Some(self.active_modifiers.remove(0))
         } else {

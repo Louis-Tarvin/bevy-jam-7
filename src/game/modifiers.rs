@@ -13,6 +13,9 @@ pub enum Modifier {
     TeleportingBark,
     Vignette,
     Night,
+    SheepSphere,
+    DogSphere,
+    FeverDream,
 }
 
 impl Modifier {
@@ -25,6 +28,9 @@ impl Modifier {
             Modifier::TeleportingBark => "Teleporting Bark",
             Modifier::Vignette => "Brain Fog",
             Modifier::Night => "Night time",
+            Modifier::SheepSphere => "Rollin'",
+            Modifier::DogSphere => "Spherical",
+            Modifier::FeverDream => "Feverdream",
         }
     }
 
@@ -41,6 +47,9 @@ impl Modifier {
                 "The clouds around the edges of the screen grow bigger, restricting your visibility."
             }
             Modifier::Night => "The sheep start asleep.",
+            Modifier::SheepSphere => "Sheep roll around like a ball.",
+            Modifier::DogSphere => "You roll around like a ball.",
+            Modifier::FeverDream => "Increases the intensity of certain other active modifiers",
         }
     }
 
@@ -54,6 +63,9 @@ impl Modifier {
             Modifier::TeleportingBark => Hard,
             Modifier::Vignette => Hard,
             Modifier::Night => Medium,
+            Modifier::SheepSphere => Medium,
+            Modifier::DogSphere => Easy,
+            Modifier::FeverDream => Hard,
         }
     }
 }
@@ -68,6 +80,9 @@ impl Distribution<Modifier> for StandardUniform {
             Modifier::TeleportingBark,
             Modifier::Vignette,
             Modifier::Night,
+            Modifier::SheepSphere,
+            Modifier::DogSphere,
+            Modifier::FeverDream,
         ];
         pool[rng.random_range(0..pool.len())]
     }

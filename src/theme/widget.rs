@@ -63,7 +63,7 @@ pub fn panel() -> impl Bundle {
         Node {
             width: percent(95),
             min_width: px(1080),
-            max_width: px(1500),
+            // max_width: px(1500), this causes weird layout bugs :(
             padding: UiRect::axes(px(14), px(28)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,

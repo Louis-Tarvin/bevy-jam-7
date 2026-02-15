@@ -5,7 +5,8 @@ use crate::{
     AppSystems, PausableSystems,
     asset_tracking::LoadResource,
     game::{
-        movement::{HopMovementController, MovementController},
+        modifiers::Modifier,
+        movement::{HopMovementController, MovementController, SphereMovementController},
         sheep::Sheep,
         state::{GamePhase, GameState},
     },
@@ -73,7 +74,7 @@ impl FromWorld for UfoAssets {
 }
 
 fn spawn_ufo(mut commands: Commands, assets: Res<UfoAssets>, game_state: Res<GameState>) {
-    if game_state.is_modifier_active(super::modifiers::Modifier::Ufo) {
+    if game_state.is_modifier_active(Modifier::Ufo) {
         commands.spawn((
             Name::new("UFO"),
             Transform::from_xyz(0.0, UFO_HEIGHT, -20.0),
@@ -81,6 +82,15 @@ fn spawn_ufo(mut commands: Commands, assets: Res<UfoAssets>, game_state: Res<Gam
             Ufo::new(),
             DespawnOnExit(GamePhase::Herding),
         ));
+        if game_state.is_modifier_active(Modifier::FeverDream) {
+            commands.spawn((
+                Name::new("UFO"),
+                Transform::from_xyz(0.0, UFO_HEIGHT, -20.0),
+                SceneRoot(assets.ufo.clone()),
+                Ufo::new(),
+                DespawnOnExit(GamePhase::Herding),
+            ));
+        }
     }
 }
 
@@ -143,9 +153,11 @@ fn update_ufo(
         if distance <= UFO_TARGET_REACHED_DISTANCE {
             if ufo.abduction_timer.is_finished() {
                 if sheep.start_abduction() {
-                    commands
-                        .entity(target)
-                        .remove::<(MovementController, HopMovementController)>();
+                    commands.entity(target).remove::<(
+                        MovementController,
+                        HopMovementController,
+                        SphereMovementController,
+                    )>();
                     ufo.abduction_timer.reset();
                     ufo.post_abduction_pause_timer.reset();
                 }
