@@ -367,15 +367,11 @@ fn buy_sheep(_: On<Pointer<Click>>, mut game_state: ResMut<GameState>) {
     }
     game_state.sheep_count += 1;
     let mut rng = rand::rng();
-    if game_state.is_charm_active(Charm::ChanceBlueOnBuy) {
-        if rng.random_ratio(1, 4) {
-            game_state.blue_sheep_count += 1;
-        }
+    if game_state.is_charm_active(Charm::ChanceBlueOnBuy) && rng.random_ratio(1, 4) {
+        game_state.blue_sheep_count += 1;
     }
-    if game_state.is_charm_active(Charm::ChanceRedOnBuy) {
-        if rng.random_ratio(1, 4) {
-            game_state.red_sheep_count += 1;
-        }
+    if game_state.is_charm_active(Charm::ChanceRedOnBuy) && rng.random_ratio(1, 4) {
+        game_state.red_sheep_count += 1;
     }
     game_state.money -= 1;
 }

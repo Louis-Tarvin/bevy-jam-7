@@ -376,16 +376,13 @@ fn sheep_state_update(
                             movement.move_speed_mult = sheep.default_speed_mult;
                             movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
                         }
+                    } else if pos.distance(danger_pos) >= player.sheep_interact_radius + 8.0 {
+                        sheep.state = SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
+                        sheep.reset_timer();
                     } else {
-                        if pos.distance(danger_pos) >= player.sheep_interact_radius + 8.0 {
-                            sheep.state =
-                                SheepState::Wander(Timer::from_seconds(0.5, TimerMode::Once));
-                            sheep.reset_timer();
-                        } else {
-                            let dir = (pos - danger_pos).normalize_or(Vec2::X);
-                            movement.move_speed_mult = sheep.spooked_speed_mult;
-                            movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
-                        }
+                        let dir = (pos - danger_pos).normalize_or(Vec2::X);
+                        movement.move_speed_mult = sheep.spooked_speed_mult;
+                        movement.apply_movement(dir * time.delta_secs() * sheep.step_distance);
                     }
                 }
             }
@@ -567,7 +564,7 @@ fn sheep_goal_check(
                         SheepColor::White => {
                             if state.is_charm_active(Charm::Evolution) {
                                 round_stats.white_sheep_counted += 1;
-                                if round_stats.white_sheep_counted % 5 == 0 {
+                                if round_stats.white_sheep_counted.is_multiple_of(5) {
                                     state.blue_sheep_count += 1;
                                     writer.write(GoalTextMessage {
                                         text: "Evolved to blue".to_string(),

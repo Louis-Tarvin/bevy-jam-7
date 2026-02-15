@@ -166,7 +166,6 @@ impl SphereMovementController {
             roll_speed_mult,
             roll_radius,
             center_offset_y,
-            ..Default::default()
         }
     }
 }
