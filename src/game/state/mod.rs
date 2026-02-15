@@ -75,7 +75,7 @@ impl GameState {
     pub fn new_round(&mut self) -> NewRoundInfo {
         self.completed_rounds += 1;
         self.points = 0;
-        self.point_target += 2 + (self.point_target / 10);
+        self.point_target += 2 + (self.point_target / 10) + (self.point_target / 40);
         let removed_modifier = if self.active_modifiers.len() > 2 {
             Some(self.active_modifiers.remove(0))
         } else {

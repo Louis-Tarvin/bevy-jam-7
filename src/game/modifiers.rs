@@ -16,6 +16,7 @@ pub enum Modifier {
     SheepSphere,
     DogSphere,
     FeverDream,
+    SheepTeleport,
 }
 
 impl Modifier {
@@ -31,6 +32,7 @@ impl Modifier {
             Modifier::SheepSphere => "Rollin'",
             Modifier::DogSphere => "Spherical",
             Modifier::FeverDream => "Feverdream",
+            Modifier::SheepTeleport => "Teleporting Sheep",
         }
     }
 
@@ -50,6 +52,9 @@ impl Modifier {
             Modifier::SheepSphere => "Sheep roll around like a ball.",
             Modifier::DogSphere => "You roll around like a ball.",
             Modifier::FeverDream => "Increases the intensity of certain other active modifiers",
+            Modifier::SheepTeleport => {
+                "Sheep that hear your bark will teleport to a random location."
+            }
         }
     }
 
@@ -66,6 +71,7 @@ impl Modifier {
             Modifier::SheepSphere => Medium,
             Modifier::DogSphere => Easy,
             Modifier::FeverDream => Hard,
+            Modifier::SheepTeleport => Hard,
         }
     }
 }
@@ -83,6 +89,7 @@ impl Distribution<Modifier> for StandardUniform {
             Modifier::SheepSphere,
             Modifier::DogSphere,
             Modifier::FeverDream,
+            Modifier::SheepTeleport,
         ];
         pool[rng.random_range(0..pool.len())]
     }

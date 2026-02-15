@@ -82,7 +82,7 @@ fn tick_player_timers(time: Res<Time>, player_query: Query<&mut Player>) {
 
 fn handle_bark(
     player_query: Query<(Entity, &mut Player, &Transform)>,
-    mut sheep_query: Query<(&mut Sheep, &Transform), Without<Player>>,
+    mut sheep_query: Query<(Entity, &mut Sheep, &Transform), Without<Player>>,
     input: Res<ButtonInput<KeyCode>>,
     mut commands: Commands,
     game_state: Res<GameState>,
@@ -93,12 +93,18 @@ fn handle_bark(
             if player.bark_cooldown.is_finished() {
                 let player_pos = player_transform.translation.xz();
                 player.bark_cooldown.reset();
-                for (mut sheep, sheep_transform) in sheep_query.iter_mut() {
+                for (sheep_entity, mut sheep, sheep_transform) in sheep_query.iter_mut() {
                     let sheep_pos = sheep_transform.translation.xz();
                     if player_pos.distance_squared(sheep_pos)
                         <= player.bark_radius * player.bark_radius
                     {
-                        sheep.become_spooked(player_pos);
+                        if game_state.is_modifier_active(Modifier::SheepTeleport) {
+                            commands.trigger(RandomTeleport {
+                                entity: sheep_entity,
+                            });
+                        } else {
+                            sheep.become_spooked(player_pos);
+                        }
                     }
                 }
                 commands.spawn(sound_effect(assets.bark.clone()));
