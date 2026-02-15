@@ -606,12 +606,21 @@ fn sheep_goal_check(
                             });
                         }
                         SheepColor::Black => {
+                            if state.is_charm_active(Charm::BlackInc) {
+                                let points = 1 + round_stats.black_sheep_counted as u32;
+                                state.points += points;
+                                writer.write(GoalTextMessage {
+                                    text: format!("+{} points", points),
+                                    color: None,
+                                });
+                            } else {
+                                state.points += 1;
+                                writer.write(GoalTextMessage {
+                                    text: "+1 point".to_string(),
+                                    color: None,
+                                });
+                            }
                             round_stats.black_sheep_counted += 1;
-                            state.points += 1;
-                            writer.write(GoalTextMessage {
-                                text: "+1 point".to_string(),
-                                color: None,
-                            });
                             if state.is_charm_active(Charm::Exponential) {
                                 let rng = &mut rand::rng();
                                 let x = rng.random_range(bounds.min.x..=bounds.max.x);

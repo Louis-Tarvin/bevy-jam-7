@@ -44,7 +44,7 @@ pub fn tick_countdown(
 ) {
     state.countdown.tick(time.delta());
     if state.countdown.just_finished() {
-        next_state.set(Screen::Title);
+        next_state.set(Screen::GameOver);
     }
 }
 
@@ -52,7 +52,7 @@ pub fn on_herding(
     mut commands: Commands,
     sheep_assets: Res<SheepAssets>,
     player_assets: Res<PlayerAssets>,
-    game_state: Res<GameState>,
+    mut game_state: ResMut<GameState>,
     mut round_stats: ResMut<RoundStats>,
     bounds: Res<LevelBounds>,
     mut camera_target: ResMut<CameraTarget>,
@@ -133,6 +133,8 @@ pub fn on_herding(
     } else {
         vignette.target_coverage = 0.2;
     }
+
+    game_state.reset_timer();
 }
 
 fn build_sheep_colors(game_state: &GameState) -> Vec<SheepColor> {

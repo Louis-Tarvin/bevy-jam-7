@@ -19,6 +19,7 @@ pub(super) fn plugin(app: &mut App) {
     app.insert_resource(GameState::default());
     app.insert_resource(RoundStats::default());
     app.add_plugins((herding::plugin, modifier_choice::plugin, shop::plugin));
+    app.add_systems(OnEnter(Screen::Title), reset_run_state);
 }
 
 #[derive(SubStates, Clone, Eq, PartialEq, Debug, Hash, Default)]
@@ -33,6 +34,7 @@ pub enum GamePhase {
 #[derive(Debug, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct GameState {
+    pub completed_rounds: u32,
     pub sheep_count: u16,
     pub blue_sheep_count: u16,
     pub red_sheep_count: u16,
@@ -51,6 +53,7 @@ pub struct GameState {
 impl Default for GameState {
     fn default() -> Self {
         Self {
+            completed_rounds: 0,
             sheep_count: 10,
             blue_sheep_count: 1,
             red_sheep_count: 1,
@@ -70,14 +73,7 @@ impl Default for GameState {
 
 impl GameState {
     pub fn new_round(&mut self) -> NewRoundInfo {
-        if self.is_charm_active(Charm::HalfTimeDoubleSheep) {
-            self.countdown
-                .set_duration(Duration::from_secs_f32(TIMER_SECONDS / 2.0));
-        } else {
-            self.countdown
-                .set_duration(Duration::from_secs_f32(TIMER_SECONDS));
-        }
-        self.countdown.reset();
+        self.completed_rounds += 1;
         self.points = 0;
         if self.point_target >= 50 {
             self.point_target += 4;
@@ -96,6 +92,17 @@ impl GameState {
             removed_modifier,
             modifier_choices,
         }
+    }
+
+    pub fn reset_timer(&mut self) {
+        if self.is_charm_active(Charm::HalfTimeDoubleSheep) {
+            self.countdown
+                .set_duration(Duration::from_secs_f32(TIMER_SECONDS / 2.0));
+        } else {
+            self.countdown
+                .set_duration(Duration::from_secs_f32(TIMER_SECONDS));
+        }
+        self.countdown.reset();
     }
 
     pub fn is_modifier_active(&self, modifier: Modifier) -> bool {
@@ -138,4 +145,14 @@ pub struct RoundStats {
     pub sheep_counted: u16,
     pub white_sheep_counted: u16,
     pub black_sheep_counted: u16,
+}
+
+fn reset_run_state(
+    mut game_state: ResMut<GameState>,
+    mut round_stats: ResMut<RoundStats>,
+    mut next_phase: ResMut<NextState<GamePhase>>,
+) {
+    *game_state = GameState::default();
+    *round_stats = RoundStats::default();
+    next_phase.set(GamePhase::Herding);
 }

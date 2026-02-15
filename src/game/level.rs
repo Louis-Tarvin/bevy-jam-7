@@ -201,14 +201,14 @@ pub fn spawn_level(
             Color::srgb(0.12, 0.15, 0.32),
             Transform::from_xyz(-1.5, 2.5, -0.5).looking_at(Vec3::ZERO, Vec3::Y),
             Color::srgb(0.35, 0.45, 0.8),
-            100.0,
+            150.0,
         )
     } else {
         (
             Color::srgb(0.9, 1.0, 0.9),
             Transform::from_xyz(0.5, 0.5, 2.0).looking_at(Vec3::ZERO, Vec3::Y),
-            Color::srgb(0.5, 0.5, 1.0),
-            150.0,
+            Color::srgb(0.7, 0.7, 1.0),
+            800.0,
         )
     };
 

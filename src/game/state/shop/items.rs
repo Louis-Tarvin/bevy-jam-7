@@ -45,7 +45,7 @@ impl ItemType {
         let boosts = [
             Boost::BlueSheep,
             Boost::RedSheep,
-            Boost::BarkPower,
+            // Boost::BarkPower,
             Boost::MaxCharms,
         ];
         let boost_idx = rng.random_range(0..boosts.len());
@@ -63,6 +63,7 @@ impl ItemType {
             Charm::ShopCount,
             Charm::Ink,
             Charm::RedToGold,
+            Charm::BlackInc,
         ];
         let available_charms: Vec<Charm> = charm_pool
             .into_iter()
@@ -146,6 +147,7 @@ pub enum Charm {
     ShopCount,
     Ink,
     RedToGold,
+    BlackInc,
 }
 
 impl Charm {
@@ -163,6 +165,7 @@ impl Charm {
             Charm::ShopCount => "Fully Stocked",
             Charm::Ink => "Ink",
             Charm::RedToGold => "Rose Gold",
+            Charm::BlackInc => "Strength in Numbers",
         }
     }
 
@@ -188,6 +191,9 @@ impl Charm {
             Charm::ShopCount => "The shop sells an additional item.",
             Charm::Ink => "Double the probability that a white sheep will spawn as black.",
             Charm::RedToGold => "If the first sheep to be counted is red, it turns gold.",
+            Charm::BlackInc => {
+                "When a black sheep is counted, all future black sheep are worth +1 points this round."
+            }
         }
     }
 
@@ -205,6 +211,7 @@ impl Charm {
             Charm::ShopCount => 3,
             Charm::Ink => 3,
             Charm::RedToGold => 4,
+            Charm::BlackInc => 4,
         }
     }
 }
