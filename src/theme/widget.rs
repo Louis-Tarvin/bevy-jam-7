@@ -57,6 +57,16 @@ pub fn label(text: impl Into<String>) -> impl Bundle {
     )
 }
 
+pub fn hud_label(text: impl Into<String>) -> impl Bundle {
+    (
+        Name::new("Label"),
+        Text(text.into()),
+        TextFont::from_font_size(30.0),
+        TextColor(LABEL_TEXT),
+        BackgroundColor(Color::WHITE.with_alpha(0.5)),
+    )
+}
+
 pub fn panel() -> impl Bundle {
     (
         Name::new("Panel"),

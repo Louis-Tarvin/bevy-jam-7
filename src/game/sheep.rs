@@ -264,7 +264,7 @@ pub fn sheep(
         } else {
             to_sheep.normalize()
         };
-        let safe_pos = goal_pos + dir * GOAL_RADIUS;
+        let safe_pos = goal_pos + (dir * 3.0) * GOAL_RADIUS;
         position.x = safe_pos.x;
         position.z = safe_pos.y;
     }

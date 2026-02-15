@@ -12,7 +12,7 @@ mod herding;
 mod modifier_choice;
 pub mod shop;
 
-const TIMER_SECONDS: f32 = 90.0;
+const TIMER_SECONDS: f32 = 70.0;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_sub_state::<GamePhase>();
@@ -75,13 +75,7 @@ impl GameState {
     pub fn new_round(&mut self) -> NewRoundInfo {
         self.completed_rounds += 1;
         self.points = 0;
-        if self.point_target >= 50 {
-            self.point_target += 4;
-        } else if self.point_target >= 30 {
-            self.point_target += 3;
-        } else {
-            self.point_target += 2;
-        }
+        self.point_target += 2 + (self.point_target / 10);
         let removed_modifier = if self.active_modifiers.len() > 2 {
             Some(self.active_modifiers.remove(0))
         } else {
@@ -97,7 +91,7 @@ impl GameState {
     pub fn reset_timer(&mut self) {
         if self.is_charm_active(Charm::HalfTimeDoubleSheep) {
             self.countdown
-                .set_duration(Duration::from_secs_f32(TIMER_SECONDS / 2.0));
+                .set_duration(Duration::from_secs_f32(TIMER_SECONDS - 20.0));
         } else {
             self.countdown
                 .set_duration(Duration::from_secs_f32(TIMER_SECONDS));

@@ -7,8 +7,11 @@ use crate::{
     asset_tracking::LoadResource,
     audio::sound_effect,
     game::{
-        level::RandomTeleport, modifiers::Modifier, movement::MovementController, sheep::Sheep,
-        state::GameState,
+        level::RandomTeleport,
+        modifiers::Modifier,
+        movement::MovementController,
+        sheep::Sheep,
+        state::{GamePhase, GameState},
     },
 };
 
@@ -18,12 +21,14 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
         (record_player_directional_input, handle_bark)
+            .run_if(in_state(GamePhase::Herding))
             .in_set(AppSystems::RecordInput)
             .in_set(PausableSystems),
     );
     app.add_systems(
         Update,
         tick_player_timers
+            .run_if(in_state(GamePhase::Herding))
             .in_set(AppSystems::TickTimers)
             .in_set(PausableSystems),
     );

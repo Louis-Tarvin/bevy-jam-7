@@ -191,7 +191,7 @@ fn draw_herding_ui(commands: &mut Commands) {
             },
             Pickable::IGNORE,
             children![
-                (widget::label("Time: 0"), HerdingTimerText),
+                (widget::hud_label("Time: 0"), HerdingTimerText),
                 (
                     Node {
                         align_items: AlignItems::FlexEnd,
@@ -200,8 +200,8 @@ fn draw_herding_ui(commands: &mut Commands) {
                         ..default()
                     },
                     children![
-                        (widget::label("Points: 0"), HerdingPointsText),
-                        (widget::label("Target: 0"), HerdingTargetText),
+                        (widget::hud_label("Points: 0"), HerdingPointsText),
+                        (widget::hud_label("Target: 0"), HerdingTargetText),
                     ],
                 ),
             ],

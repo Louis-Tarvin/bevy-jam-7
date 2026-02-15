@@ -309,14 +309,14 @@ fn item_card(slot: usize, item: ItemType, money: u32, charms_full: bool) -> impl
             parent.spawn((
                 Name::new("Item Name"),
                 Text(item.name().to_string()),
-                TextFont::from_font_size(22.0),
+                TextFont::from_font_size(20.0),
                 TextColor(ui_palette::HEADER_TEXT),
                 TextLayout::new_with_justify(Justify::Center),
             ));
             parent.spawn((
                 Name::new("Item Description"),
                 Text(item.description().to_string()),
-                TextFont::from_font_size(16.0),
+                TextFont::from_font_size(14.0),
                 TextColor(ui_palette::LABEL_TEXT),
                 TextLayout::new_with_justify(Justify::Center),
             ));

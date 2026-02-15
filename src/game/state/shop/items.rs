@@ -172,7 +172,9 @@ impl Charm {
     pub fn description(&self) -> &'static str {
         match self {
             Charm::GoldenSheep => "Spawn a golden sheep that gives 1 money when counted.",
-            Charm::HalfTimeDoubleSheep => "Halve the timer but spawn double the sheep.",
+            Charm::HalfTimeDoubleSheep => {
+                "Spawn two of every sheep in your flock, but reduces the timer by 20s."
+            }
             Charm::ChanceBlueOnBuy => {
                 "Each time you buy a sheep it has a 1 in 4 chance to be blue."
             }
@@ -199,8 +201,8 @@ impl Charm {
 
     pub fn price(&self) -> u32 {
         match self {
-            Charm::GoldenSheep => 5,
-            Charm::HalfTimeDoubleSheep => 4,
+            Charm::GoldenSheep => 4,
+            Charm::HalfTimeDoubleSheep => 5,
             Charm::ChanceBlueOnBuy => 3,
             Charm::ChanceRedOnBuy => 3,
             Charm::Exponential => 5,

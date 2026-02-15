@@ -78,7 +78,7 @@ impl Default for DreamCloudVignette {
         Self {
             coverage: 1.0,
             target_coverage: 0.2,
-            transition_speed: 3.0,
+            transition_speed: 2.0,
             edge_softness: 0.03,
             boundary_thickness: 0.08,
             wobble_strength: 0.045,
