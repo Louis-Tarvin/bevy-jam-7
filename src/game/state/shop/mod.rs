@@ -1,10 +1,13 @@
 use bevy::prelude::*;
 
-use crate::game::state::{
-    GamePhase, GameState,
-    shop::{
-        items::{Charm, ItemType},
-        ui::redraw_shop_ui,
+use crate::{
+    audio::BgmConfig,
+    game::state::{
+        GamePhase, GameState,
+        shop::{
+            items::{Charm, ItemType},
+            ui::redraw_shop_ui,
+        },
     },
 };
 
@@ -31,7 +34,14 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(Update, redraw_shop_ui.run_if(in_state(GamePhase::Shop)));
 }
 
-fn on_shop(mut shop_offers: ResMut<ShopOffers>, game_state: Res<GameState>) {
+fn on_shop(
+    mut shop_offers: ResMut<ShopOffers>,
+    mut bgm_config: ResMut<BgmConfig>,
+    game_state: Res<GameState>,
+) {
+    bgm_config.base_enabled = true;
+    bgm_config.extra_enabled = true;
+    bgm_config.percussion_enabled = false;
     let count = if game_state.is_charm_active(Charm::ShopCount) {
         4
     } else {

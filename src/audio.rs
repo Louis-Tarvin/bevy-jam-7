@@ -1,9 +1,13 @@
-use bevy::prelude::*;
+use bevy::{audio::Volume, prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
+    app.init_resource::<BgmConfig>();
     app.add_systems(
         Update,
-        apply_global_volume.run_if(resource_changed::<GlobalVolume>),
+        (
+            apply_global_volume.run_if(resource_changed::<GlobalVolume>),
+            bgm_config_changed.run_if(resource_changed::<BgmConfig>),
+        ),
     );
 }
 
@@ -15,9 +19,56 @@ pub(super) fn plugin(app: &mut App) {
 #[reflect(Component)]
 pub struct Music;
 
+#[derive(Debug, Component)]
+pub enum MusicLayer {
+    Base,
+    Extra,
+    Perc,
+}
+
 /// A music audio instance.
 pub fn music(handle: Handle<AudioSource>) -> impl Bundle {
     (AudioPlayer(handle), PlaybackSettings::LOOP, Music)
+}
+
+#[derive(Debug, Resource, Default, Reflect)]
+#[reflect(Resource)]
+pub struct BgmConfig {
+    pub base_enabled: bool,
+    pub extra_enabled: bool,
+    pub percussion_enabled: bool,
+}
+
+fn bgm_config_changed(
+    config: Res<BgmConfig>,
+    global_volume: Res<GlobalVolume>,
+    query: Query<(&mut AudioSink, &MusicLayer)>,
+) {
+    for (mut sink, layer) in query {
+        match layer {
+            MusicLayer::Base => {
+                if config.base_enabled {
+                    sink.set_volume(global_volume.volume);
+                } else {
+                    sink.set_volume(Volume::SILENT);
+                }
+            }
+            MusicLayer::Extra => {
+                if config.extra_enabled {
+                    sink.set_volume(global_volume.volume);
+                } else {
+                    sink.set_volume(Volume::SILENT);
+                }
+            }
+            MusicLayer::Perc => {
+                if config.percussion_enabled {
+                    sink.set_volume(global_volume.volume);
+                } else {
+                    sink.set_volume(Volume::SILENT);
+                }
+            }
+        }
+    }
 }
 
 /// An organizational marker component that should be added to a spawned [`AudioPlayer`] if it's in the
@@ -39,6 +90,7 @@ pub fn sound_effect_3d(handle: Handle<AudioSource>, translation: Vec3) -> impl B
         PlaybackSettings {
             mode: bevy::audio::PlaybackMode::Despawn,
             spatial: true,
+            volume: Volume::Linear(0.8),
             ..PlaybackSettings::ONCE
         },
         SoundEffect,

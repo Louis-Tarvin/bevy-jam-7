@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::{game::level::start_music, screens::Screen};
+
 pub mod camera;
 pub mod level;
 pub mod modifiers;
@@ -19,4 +21,5 @@ pub(super) fn plugin(app: &mut App) {
         state::plugin,
         ufo::plugin,
     ));
+    app.add_systems(OnEnter(Screen::Gameplay), start_music);
 }

@@ -1,9 +1,13 @@
 //! Spawn the main level.
 
 use bevy::prelude::*;
+use rand::Rng;
 
 use crate::{
-    AppSystems, PausableSystems, asset_tracking::LoadResource, game::camera::MainCamera,
+    AppSystems, PausableSystems,
+    asset_tracking::LoadResource,
+    audio::{MusicLayer, music},
+    game::camera::MainCamera,
     screens::Screen,
 };
 
@@ -28,6 +32,7 @@ pub(super) fn plugin(app: &mut App) {
         min: (-27.6, -39.6).into(),
         max: (27.6, 7.6).into(),
     });
+    app.add_observer(handle_random_teleport);
 }
 
 #[derive(Resource, Debug, Reflect)]
@@ -49,8 +54,12 @@ impl LevelBounds {
 #[derive(Resource, Asset, Clone, Reflect)]
 #[reflect(Resource)]
 pub struct LevelAssets {
-    // #[dependency]
-    // music: Handle<AudioSource>,
+    #[dependency]
+    bgm_layer_1: Handle<AudioSource>,
+    #[dependency]
+    bgm_layer_2: Handle<AudioSource>,
+    #[dependency]
+    bgm_layer_3: Handle<AudioSource>,
     #[dependency]
     arena: Handle<Scene>,
 }
@@ -59,9 +68,30 @@ impl FromWorld for LevelAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.resource::<AssetServer>();
         Self {
-            // music: assets.load("audio/music/Fluffing A Duck.ogg"),
+            bgm_layer_1: assets.load("audio/music/bgm_layer_1.ogg"),
+            bgm_layer_2: assets.load("audio/music/bgm_layer_2.ogg"),
+            bgm_layer_3: assets.load("audio/music/bgm_layer_3.ogg"),
             arena: assets.load("obj/arena.glb#Scene0"),
         }
+    }
+}
+
+#[derive(EntityEvent)]
+pub struct RandomTeleport {
+    pub entity: Entity,
+}
+
+fn handle_random_teleport(
+    event: On<RandomTeleport>,
+    mut query: Query<&mut Transform>,
+    bounds: Res<LevelBounds>,
+) {
+    if let Ok(mut transform) = query.get_mut(event.entity) {
+        let rng = &mut rand::rng();
+        let x = rng.random_range(bounds.min.x..=bounds.max.x);
+        let z = rng.random_range(bounds.min.y..=bounds.max.y);
+        let pos = Vec3::new(x, 0.0, z);
+        transform.translation = pos;
     }
 }
 
@@ -169,10 +199,10 @@ pub fn spawn_level(
                 Name::new("Sun"),
                 DirectionalLight {
                     shadows_enabled: true,
-                    color: Color::srgb(0.284, 0.358, 0.659),
+                    color: Color::srgb(0.9, 1.0, 0.9),
                     ..Default::default()
                 },
-                Transform::from_xyz(0.5, 1.5, 0.5).looking_at(Vec3::ZERO, Vec3::Y)
+                Transform::from_xyz(0.5, 0.5, 2.0).looking_at(Vec3::ZERO, Vec3::Y)
             ),
             (
                 Name::new("Goal"),
@@ -188,5 +218,23 @@ pub fn spawn_level(
                 // }
             )
         ],
+    ));
+}
+
+pub fn start_music(mut commands: Commands, assets: Res<LevelAssets>) {
+    commands.spawn((
+        music(assets.bgm_layer_1.clone()),
+        MusicLayer::Base,
+        DespawnOnExit(Screen::Gameplay),
+    ));
+    commands.spawn((
+        music(assets.bgm_layer_2.clone()),
+        MusicLayer::Extra,
+        DespawnOnExit(Screen::Gameplay),
+    ));
+    commands.spawn((
+        music(assets.bgm_layer_3.clone()),
+        MusicLayer::Perc,
+        DespawnOnExit(Screen::Gameplay),
     ));
 }

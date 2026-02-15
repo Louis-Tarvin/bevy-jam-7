@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
+    audio::BgmConfig,
     game::{
         modifiers::Modifier,
         state::{GamePhase, GameState, NewRoundInfo},
@@ -20,7 +21,12 @@ fn on_modifier_choice(
     mut commands: Commands,
     mut vignette: ResMut<DreamCloudVignette>,
     mut game_state: ResMut<GameState>,
+    mut bgm_config: ResMut<BgmConfig>,
 ) {
+    bgm_config.base_enabled = true;
+    bgm_config.extra_enabled = false;
+    bgm_config.percussion_enabled = false;
+
     let NewRoundInfo {
         removed_modifier,
         modifier_choices,

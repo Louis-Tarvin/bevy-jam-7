@@ -5,7 +5,11 @@ use bevy::{light::NotShadowCaster, prelude::*};
 use crate::{
     AppSystems, PausableSystems,
     asset_tracking::LoadResource,
-    game::{modifiers::Modifier, movement::MovementController, sheep::Sheep, state::GameState},
+    audio::sound_effect,
+    game::{
+        level::RandomTeleport, modifiers::Modifier, movement::MovementController, sheep::Sheep,
+        state::GameState,
+    },
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -67,12 +71,15 @@ fn tick_player_timers(time: Res<Time>, player_query: Query<&mut Player>) {
 }
 
 fn handle_bark(
-    player_query: Query<(&mut Player, &Transform)>,
+    player_query: Query<(Entity, &mut Player, &Transform)>,
     mut sheep_query: Query<(&mut Sheep, &Transform), Without<Player>>,
     input: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands,
+    game_state: Res<GameState>,
+    assets: Res<PlayerAssets>,
 ) {
     if input.just_pressed(KeyCode::KeyE) || input.just_pressed(KeyCode::Space) {
-        for (mut player, player_transform) in player_query {
+        for (entity, mut player, player_transform) in player_query {
             if player.bark_cooldown.is_finished() {
                 let player_pos = player_transform.translation.xz();
                 player.bark_cooldown.reset();
@@ -83,6 +90,10 @@ fn handle_bark(
                     {
                         sheep.become_spooked(player_pos);
                     }
+                }
+                commands.spawn(sound_effect(assets.bark.clone()));
+                if game_state.is_modifier_active(Modifier::TeleportingBark) {
+                    commands.trigger(RandomTeleport { entity });
                 }
             }
         }
@@ -170,6 +181,8 @@ pub struct PlayerAssets {
     #[dependency]
     pub steps: Vec<Handle<AudioSource>>,
     #[dependency]
+    pub bark: Handle<AudioSource>,
+    #[dependency]
     pub scene: Handle<Scene>,
 }
 
@@ -183,6 +196,7 @@ impl FromWorld for PlayerAssets {
                 assets.load("audio/sound_effects/step3.ogg"),
                 assets.load("audio/sound_effects/step4.ogg"),
             ],
+            bark: assets.load("audio/sound_effects/bark.ogg"),
             scene: assets.load("obj/dog.glb#Scene0"),
         }
     }

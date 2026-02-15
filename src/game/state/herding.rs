@@ -3,6 +3,7 @@ use rand::Rng;
 
 use crate::{
     AppSystems, PausableSystems,
+    audio::BgmConfig,
     game::{
         camera::CameraTarget,
         level::LevelBounds,
@@ -56,8 +57,13 @@ pub fn on_herding(
     bounds: Res<LevelBounds>,
     mut camera_target: ResMut<CameraTarget>,
     mut vignette: ResMut<DreamCloudVignette>,
+    mut bgm_config: ResMut<BgmConfig>,
 ) {
     *round_stats = RoundStats::default();
+
+    bgm_config.base_enabled = true;
+    bgm_config.extra_enabled = true;
+    bgm_config.percussion_enabled = true;
 
     let total_sheep = game_state.sheep_count as usize;
     if total_sheep == 0 {

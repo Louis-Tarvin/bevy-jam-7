@@ -57,7 +57,7 @@ impl ItemType {
             Charm::ChanceBlueOnBuy,
             Charm::ChanceRedOnBuy,
             Charm::Exponential,
-            Charm::WellTrained,
+            // Charm::WellTrained,
             Charm::Evolution,
             Charm::Cloning,
             Charm::ShopCount,

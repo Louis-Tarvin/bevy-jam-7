@@ -12,6 +12,7 @@ pub enum Modifier {
     Space,
     TeleportingBark,
     Vignette,
+    Night,
 }
 
 impl Modifier {
@@ -23,6 +24,7 @@ impl Modifier {
             Modifier::Space => "Space",
             Modifier::TeleportingBark => "Teleporting Bark",
             Modifier::Vignette => "Brain Fog",
+            Modifier::Night => "Night time",
         }
     }
 
@@ -36,8 +38,9 @@ impl Modifier {
                 "Every time you bark you'll be teleported to a random location."
             }
             Modifier::Vignette => {
-                "The clouds around the edges of the screen grow bigger, restricting your visibility"
+                "The clouds around the edges of the screen grow bigger, restricting your visibility."
             }
+            Modifier::Night => "The sheep start asleep.",
         }
     }
 
@@ -50,6 +53,7 @@ impl Modifier {
             Modifier::Space => Hard,
             Modifier::TeleportingBark => Hard,
             Modifier::Vignette => Hard,
+            Modifier::Night => Medium,
         }
     }
 }
@@ -63,6 +67,7 @@ impl Distribution<Modifier> for StandardUniform {
             Modifier::Space,
             Modifier::TeleportingBark,
             Modifier::Vignette,
+            Modifier::Night,
         ];
         pool[rng.random_range(0..pool.len())]
     }
